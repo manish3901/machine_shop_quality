@@ -1,0 +1,68 @@
+# Python cache / compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Environment / local config
+.env
+.env.*
+!.env.example
+
+# Editor / OS files
+.vscode/
+.idea/
+*.swp
+*.swo
+Thumbs.db
+.DS_Store
+
+# Logs
+*.log
+sync_output.log
+debug_output.txt
+direct_output.txt
+final_debug.txt
+db_diag.txt
+
+# Local runtime / uploads
+uploads/
+instance/
+
+# Test / coverage artifacts
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Build / packaging
+build/
+dist/
+*.egg-info/
+
+# SQLite and local database dumps / backups
+*.db
+*.sqlite
+*.sqlite3
+*.sql
+*.backup
+
+# Notebook checkpoints
+.ipynb_checkpoints/
+
+# Python tool caches
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+
+# Local archive / temporary files
+tmp/
+temp/
+*.tmp
+*.bak

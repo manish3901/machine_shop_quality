@@ -1,0 +1,812 @@
+{% extends "base.html" %}
+
+{% block page_title %}Production Records{% endblock %}
+{% block page_subtitle %}Production Data Log{% endblock %}
+
+{% block title %}Production Records{% endblock %}
+
+{% block content %}
+<h1 class="page-title"><i class="fas fa-list"></i> Production Records</h1>
+
+<!-- Filters -->
+<div class="row mb-4">
+    <div class="col-lg-12">
+        <div class="card">
+            <div class="card-header"><i class="fas fa-filter"></i> Filters</div>
+            <div class="card-body">
+                <form method="GET" class="row g-3">
+                    <!-- Row 1: Entry No, Machine, Shift -->
+                    <div class="col-md-2">
+                        <label for="entry_no" class="form-label">Entry No</label>
+                        <input type="text" class="form-control" id="entry_no" name="entry_no"
+                            placeholder="e.g. MS-2026-0001" value="{{ request.args.get('entry_no', '') }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label for="emp_code" class="form-label">Employee Code</label>
+                        <input type="text" class="form-control" id="emp_code" name="emp_code"
+                            placeholder="E1234" value="{{ request.args.get('emp_code', '') }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label for="machine_id" class="form-label">Machine</label>
+                        <select class="form-select select2" id="machine_id" name="machine_id">
+                            <option value="">All Machines</option>
+                            {% for machine in machines %}
+                            <option value="{{ machine.id }}" {% if request.args.get('machine_id')==machine.id|string
+                                %}selected{% endif %}>
+                                {{ machine.machine_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="shift" class="form-label">Shift</label>
+                        <select class="form-select" id="shift" name="shift">
+                            <option value="">All Shifts</option>
+                            <option value="A" {% if request.args.get('shift')=='A' %}selected{% endif %}>A Shift
+                            </option>
+                            <option value="B" {% if request.args.get('shift')=='B' %}selected{% endif %}>B Shift
+                            </option>
+                            <option value="C" {% if request.args.get('shift')=='C' %}selected{% endif %}>C Shift
+                            </option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="customer_id" class="form-label">Customer</label>
+                        <select class="form-select select2" id="customer_id" name="customer_id">
+                            <option value="">All Customers</option>
+                            {% for customer in customers %}
+                            <option value="{{ customer.id }}" {% if request.args.get('customer_id')==customer.id|string
+                                %}selected{% endif %}>
+                                {{ customer.customer_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Row 2: Section, Cut Length, Process, Start Datetime, End Datetime -->
+                    <div class="col-md-3">
+                        <label for="section_number" class="form-label">Section Number</label>
+                        <select class="form-select" id="section_number" name="section_number"
+                            data-selected="{{ request.args.get('section_number', request.args.get('section', '')) }}">
+                            <option value="">All Sections</option>
+                            {% for s in sections %}
+                            <option value="{{ s.section_number }}" {% if request.args.get('section_number', request.args.get('section', ''))==s.section_number %}selected{% endif %}>
+                                {{ s.section_number }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="cut_length" class="form-label">Cut Length (mm)</label>
+                        <select class="form-select" id="cut_length" name="cut_length"
+                            data-selected="{{ request.args.get('cut_length', request.args.get('cutlength', '')) }}">
+                            <option value="">All Cut Lengths</option>
+                            {% for cl in cut_lengths %}
+                            <option value="{{ cl.cut_length }}" {% if request.args.get('cut_length', request.args.get('cutlength', ''))==cl.cut_length|string %}selected{% endif %}>
+                                {{ cl.cut_length }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="operation_type_id" class="form-label">Process / Opn</label>
+                        <select class="form-select" id="operation_type_id" name="operation_type_id"
+                            data-selected="{{ request.args.get('operation_type_id', '') }}">
+                            <option value="">All Process</option>
+                            {% for op in operations %}
+                            <option value="{{ op.id }}" {% if request.args.get('operation_type_id')==op.id|string %}selected{% endif %}>
+                                {{ op.operation_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="start_time" class="form-label">Prod. Start From</label>
+                        <input type="datetime-local" class="form-control" id="start_time" name="start_time"
+                            value="{{ start_time_value }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label for="end_time" class="form-label">Prod. End To</label>
+                        <input type="datetime-local" class="form-control" id="end_time" name="end_time"
+                            value="{{ end_time_value }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label for="quality_status" class="form-label">Quality Status</label>
+                        <select class="form-select" id="quality_status" name="quality_status">
+                            <option value="">All</option>
+                            <option value="pending" {% if request.args.get('quality_status')=='pending' %}selected{% endif %}>Pending Inspection</option>
+                            <option value="completed" {% if request.args.get('quality_status')=='completed' %}selected{% endif %}>Inspection Completed</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-1 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                    <div class="col-md-1 d-flex align-items-end">
+                        <a href="{{ url_for('web.view_entries') }}" class="btn btn-secondary w-100">
+                            <i class="fas fa-undo"></i>
+                        </a>
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <a href="{{ url_for('web.export_entries_excel', **request.args) }}" class="btn btn-success w-100">
+                            <i class="fas fa-file-excel me-1"></i> Export
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Entries Table -->
+<div class="row">
+    <div class="col-lg-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-table"></i> Production Records ({{ pagination.total }} total)
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Entry No</th>
+                                <th>Date</th>
+                                <th>Machine</th>
+                                <th>Customer / Job Details</th>
+                                <th>Planned</th>
+                                <th>Actual</th>
+                                <th>Final OK</th>
+                                <th>Quality Status</th>
+                                <th>Efficiency</th>
+                                {% if session.get('user', {}).get('role_id') == 1 or has_quality_access(session.get('user_id'), 'rejection_form') or has_quality_access(session.get('user_id'), 'rejection_records') %}
+                                <th>Quality Actions</th>
+                                {% endif %}
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for entry in entries %}
+                            <tr>
+                                <td>
+                                    <span class="badge bg-secondary">{{ entry.entry_no }}</span>
+                                </td>
+                                <td>{{ entry.production_date.strftime('%d-%m-%Y') }}</td>
+                                <td>{{ entry.machine.machine_name }}</td>
+                                <td>
+                                    <div class="fw-bold">{{ entry.customer.customer_name }}</div>
+                                    <div class="small text-muted">{{ entry.section_number }} / {{ entry.cut_length }}mm</div>
+                                </td>
+                                <td>{{ entry.planned_quantity }}</td>
+                                <td>{{ entry.actual_quantity }}</td>
+                                <td class="fw-bold text-success">{{ entry.total_ok_quantity }}</td>
+                                <td>
+                                    {% if entry.rejection %}
+                                    <span class="badge bg-success"><i class="fas fa-check-circle me-1"></i>Inspected</span>
+                                    {% else %}
+                                    <span class="badge bg-warning"><i class="fas fa-clock me-1"></i>Pending</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-info">{{ "%.1f"|format(entry.efficiency) }}%</span>
+                                </td>
+                                {% if session.get('user', {}).get('role_id') == 1 or has_quality_access(session.get('user_id'), 'rejection_form') %}
+                                <td>
+                                    {% if not entry.rejection %}
+                                    <a href="{{ url_for('rejection.rejection_form', production_id=entry.id) }}"
+                                        class="btn btn-sm btn-outline-warning" title="Quality Action Pending">
+                                        <i class="fas fa-clock me-1"></i>Pending
+                                    </a>
+                                    {% else %}
+                                    <button type="button" class="btn btn-sm btn-success view-entry-full-btn"
+                                        data-id="{{ entry.id }}" data-rejection-id="{{ entry.rejection.id }}"
+                                        title="Quality Rejection Completed">
+                                        <i class="fas fa-check-circle me-1"></i>Completed
+                                    </button>
+                                    {% endif %}
+                                </td>
+                                {% endif %}
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-info view-entry-btn"
+                                        data-id="{{ entry.id }}" title="View Detail">
+                                        <i class="fas fa-eye text-white"></i>
+                                    </button>
+                                    <a href="/entry/{{ entry.id }}/edit"
+                                        class="btn btn-sm btn-warning {% if entry.rejection %}disabled{% endif %}"
+                                        title="Edit {% if entry.rejection %}(Locked - Quality submitted){% endif %}" {%
+                                        if entry.rejection %}aria-disabled="true"
+                                        style="pointer-events: none; opacity: 0.6;" {% endif %}>
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="11" class="text-center text-muted py-4">No entries found</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                {% if pagination.pages > 1 %}
+                <nav aria-label="Page navigation" class="mt-4">
+                    <ul class="pagination justify-content-center">
+                        {% if pagination.has_prev %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page=1">First</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ pagination.prev_num }}">Previous</a>
+                        </li>
+                        {% endif %}
+
+                        {% for page_num in pagination.iter_pages() %}
+                        {% if page_num %}
+                        {% if page_num == pagination.page %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ page_num }}</span>
+                        </li>
+                        {% else %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_num }}">{{ page_num }}</a>
+                        </li>
+                        {% endif %}
+                        {% endif %}
+                        {% endfor %}
+
+                        {% if pagination.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ pagination.next_num }}">Next</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ pagination.pages }}">Last</a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Entry Detail Modal -->
+<div class="modal fade" id="entryDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 15px; overflow: hidden;">
+            <div class="modal-header bg-primary text-white border-0 py-3">
+                <h5 class="modal-title fw-bold"><i class="fas fa-file-invoice me-2"></i> Production Record Detail</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                    aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4" id="modalBody">
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2 text-muted">Loading details...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        // Initialize Select2
+        if (window.jQuery && $.fn.select2) {
+            $('.select2').select2({
+                theme: 'bootstrap-5',
+                width: '100%'
+            });
+        }
+
+        // Cascading filter dropdowns: customer -> section -> cut length.
+        const customerFilter = document.getElementById('customer_id');
+        const sectionFilter = document.getElementById('section_number');
+        const cutLengthFilter = document.getElementById('cut_length');
+        const operationFilter = document.getElementById('operation_type_id');
+        const machineFilter = document.getElementById('machine_id');
+        function resetSelect(el, label) {
+            if (!el) return;
+            el.innerHTML = '';
+            el.add(new Option(label, ''));
+        }
+        function fetchJson(url) {
+            return fetch(url).then(r => {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.json();
+            });
+        }
+        function loadAllOperations() {
+            if (!operationFilter) return Promise.resolve();
+            return fetchJson('/master/api/operations').then(rows => {
+                resetSelect(operationFilter, 'All Process');
+                (rows || []).forEach(op => operationFilter.add(new Option(op.operation_name, op.id)));
+                const selected = operationFilter.dataset.selected;
+                if (selected) operationFilter.value = selected;
+            }).catch(() => { });
+        }
+        function loadSections() {
+            if (!customerFilter || !sectionFilter) return Promise.resolve();
+            const customerId = customerFilter.value;
+            if (!customerId) {
+                resetSelect(sectionFilter, 'All Sections');
+                resetSelect(cutLengthFilter, 'All Cut Lengths');
+                return loadAllOperations();
+            }
+            return fetchJson('/master/api/sections/' + encodeURIComponent(customerId))
+                .then(rows => {
+                    resetSelect(sectionFilter, 'All Sections');
+                    (rows || []).forEach(s => sectionFilter.add(new Option(s.number, s.number)));
+                    const selected = sectionFilter.dataset.selected;
+                    if (selected) sectionFilter.value = selected;
+                    sectionFilter.dataset.selected = '';
+                    return loadCutLengths();
+                })
+                .catch(() => {
+                    resetSelect(sectionFilter, 'All Sections');
+                    resetSelect(cutLengthFilter, 'All Cut Lengths');
+                });
+        }
+        function loadCutLengths() {
+            if (!sectionFilter || !cutLengthFilter) return Promise.resolve();
+            const customerId = customerFilter ? customerFilter.value : '';
+            const sectionNumber = sectionFilter.value;
+            if (!customerId || !sectionNumber) {
+                resetSelect(cutLengthFilter, 'All Cut Lengths');
+                return loadAllOperations();
+            }
+            return fetchJson('/master/api/sections/' + encodeURIComponent(customerId))
+                .then(sections => {
+                    const match = (sections || []).find(s => String(s.number) === String(sectionNumber));
+                    if (!match) throw new Error('Section not found');
+                    return fetchJson('/master/api/cut-lengths/' + encodeURIComponent(match.id));
+                })
+                .then(rows => {
+                    resetSelect(cutLengthFilter, 'All Cut Lengths');
+                    (rows || []).forEach(cl => cutLengthFilter.add(new Option(String(cl.length), String(cl.length))));
+                    const selected = cutLengthFilter.dataset.selected;
+                    if (selected) cutLengthFilter.value = selected;
+                    cutLengthFilter.dataset.selected = '';
+                    const machineId = machineFilter ? machineFilter.value : '';
+                    if (!machineId || !customerId || !sectionNumber || !cutLengthFilter.value) return loadAllOperations();
+                    return fetchJson('/master/api/operations/by-combo?machine_id=' + encodeURIComponent(machineId) + '&customer_id=' + encodeURIComponent(customerId) + '&section_id=' + encodeURIComponent(match.id) + '&cut_length_id=' + encodeURIComponent((rows || []).find(r => String(r.length) === String(cutLengthFilter.value))?.id || ''))
+                        .then(ops => {
+                            if (!ops || !ops.length) return loadAllOperations();
+                            resetSelect(operationFilter, 'All Process');
+                            ops.forEach(op => operationFilter.add(new Option(op.operation_name, op.id || op.operation_type_id)));
+                            const selected = operationFilter.dataset.selected;
+                            if (selected) operationFilter.value = selected;
+                        })
+                        .catch(() => loadAllOperations());
+                })
+                .catch(() => {
+                    resetSelect(cutLengthFilter, 'All Cut Lengths');
+                });
+        }
+        if (customerFilter) customerFilter.addEventListener('change', loadSections);
+        if (sectionFilter) sectionFilter.addEventListener('change', loadCutLengths);
+        if (machineFilter) machineFilter.addEventListener('change', loadCutLengths);
+        if (cutLengthFilter) cutLengthFilter.addEventListener('change', loadCutLengths);
+        if (customerFilter && customerFilter.value) loadSections();
+        else loadAllOperations();
+
+        function formatDateTime(iso) {
+            if (!iso) return '-';
+            var d = new Date(iso);
+            if (isNaN(d.getTime())) return iso;
+            return d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        }
+
+        function getEfficiencyBadgeClass(efficiency) {
+            if (efficiency >= 90) return 'bg-success';
+            if (efficiency >= 75) return 'bg-info';
+            if (efficiency >= 50) return 'bg-warning';
+            return 'bg-danger';
+        }
+
+        function openEntryDetail(entryId) {
+            var modalEl = document.getElementById('entryDetailModal');
+            if (!modalEl) {
+                console.error('Modal element not found');
+                return;
+            }
+            var modalBody = document.getElementById('modalBody');
+            if (!modalBody) return;
+            var modal = (window.bootstrap && window.bootstrap.Modal) ? new window.bootstrap.Modal(modalEl) : null;
+
+            if (modal) modal.show();
+            modalBody.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-2 text-muted">Loading details...</p></div>';
+
+            fetch('/api/production-entries/' + entryId)
+                .then(function (response) {
+                    return response.json().then(function (data) {
+                        return { ok: response.ok, body: data };
+                    });
+                })
+                .then(function (result) {
+                    var entry = result.body;
+                    if (!result.ok) throw new Error(entry.error || 'Failed to fetch');
+
+                    // Normalize API keys to what this modal renderer expects.
+                    if (!entry.operators && entry.operators_detailed) {
+                        entry.operators = entry.operators_detailed;
+                    }
+                    if (!entry.supervisors && entry.supervisors_detailed) {
+                        entry.supervisors = entry.supervisors_detailed;
+                    }
+                    if (!entry.downtime_entries && entry.planned_downtime) {
+                        entry.downtime_entries = entry.planned_downtime.map(function (pd) {
+                            return {
+                                reason_name: pd.reason || 'N/A',
+                                minutes: pd.duration || 0
+                            };
+                        });
+                    }
+                    if (!entry.operations && entry.operations_detailed) {
+                        entry.operations = entry.operations_detailed;
+                    }
+
+                    var totalPlannedDowntimeSum = (entry.downtime_entries || []).reduce(function (acc, d) {
+                        return acc + (parseFloat(d.minutes) || parseFloat(d.duration) || 0);
+                    }, 0);
+                    if (!totalPlannedDowntimeSum) {
+                        totalPlannedDowntimeSum = parseFloat(entry.downtime_minutes) || parseFloat(entry.total_planned_downtime_minutes) || 0;
+                    }
+
+                    var totalRunMins = parseFloat(entry.total_time_taken_minutes) || parseFloat(entry.total_shift_time_minutes) || 0;
+                    var idealCyclePerPcSum = parseFloat(entry.ideal_cycle_time) || parseFloat(entry.ideal_cycle_time_sum) || 0;
+                    var totalIdealMins = parseFloat(entry.total_ideal_time_minutes) || parseFloat(entry.total_ideal_time) || 0;
+                    if (!totalIdealMins && idealCyclePerPcSum > 0) {
+                        var actualQty = parseFloat(entry.actual_quantity) || parseFloat(entry.total_ok) || 0;
+                        totalIdealMins = actualQty * idealCyclePerPcSum;
+                    }
+                    var totalUnaccountedMins = totalRunMins - totalIdealMins;
+                    var selfRejectionQty = parseFloat(entry.total_self_rejection_pcs) || parseFloat(entry.self_rejection_qty) || parseFloat(entry.self_rejection) || 0;
+                    var selfRejectionWeightPerPc = parseFloat(entry.self_rejection_weight_per_pcs) || 0;
+                    var machiningScrapKg = parseFloat(entry.total_machining_scrap_kg || entry.machining_scrap_weight_kg) || 0;
+                    var totalSelfRejectionKg = parseFloat(entry.total_self_rejection_kg) || (selfRejectionWeightPerPc * selfRejectionQty) || 0;
+                    var totalSelfRejectionAllKg = parseFloat(entry.total_self_rejection_all_kg) || (totalSelfRejectionKg + machiningScrapKg) || 0;
+                    var entryEfficiency = parseFloat(entry.efficiency);
+                    if (isNaN(entryEfficiency)) {
+                        entryEfficiency = 0;
+                    }
+                    var reworkDetails = entry.rework_details || [];
+                    var totalReworkQty = parseFloat(entry.rework_qty) || 0;
+                    var reworkDetailsHtml = '';
+                    if (reworkDetails.length) {
+                        reworkDetailsHtml = '<div class="list-group list-group-flush bg-transparent">' +
+                            reworkDetails.map(function (detail) {
+                                var qty = parseFloat(detail.rework_qty) || 0;
+                                return '<div class="list-group-item px-0 py-1 bg-transparent border-0 d-flex justify-content-between small">' +
+                                    '<span><i class="fas fa-tools text-info me-1"></i>' + (detail.defect_type || 'Defect') + '</span>' +
+                                    '<span class="fw-bold">' + qty.toFixed(0) + ' pcs</span>' +
+                                    '</div>';
+                            }).join('') +
+                            '</div>';
+                    } else {
+                        reworkDetailsHtml = '<div class="text-muted small">No rework logged yet.</div>';
+                    }
+                    var selfRejectionDetails = entry.self_rejection_details || [];
+                    var selfRejectionDetailsHtml = '';
+                    if (selfRejectionDetails.length) {
+                        selfRejectionDetailsHtml = '<div class="list-group list-group-flush bg-transparent">' +
+                            selfRejectionDetails.map(function (detail) {
+                                var qty = parseFloat(detail.reject_qty) || 0;
+                                return '<div class="list-group-item px-0 py-1 bg-transparent border-0 d-flex justify-content-between small">' +
+                                    '<span><i class="fas fa-ban text-danger me-1"></i>' + (detail.defect_type || 'Defect') + '</span>' +
+                                    '<span class="fw-bold">' + qty.toFixed(0) + ' pcs</span>' +
+                                    '</div>';
+                            }).join('') +
+                            '</div>';
+                    } else {
+                        selfRejectionDetailsHtml = '<div class="text-muted small">No self rejection details logged.</div>';
+                    }
+
+                    // Production Issues HTML
+                    var issuesHtml = '';
+                    if (entry.issues && entry.issues.length > 0) {
+                        issuesHtml = '<div class="mt-4">' +
+                            '<h6 class="fw-bold text-danger border-bottom pb-2 mb-3">Reported Production Issues</h6>' +
+                            '<div class="list-group list-group-flush">' +
+                            entry.issues.map(function (issue) {
+                                return '<div class="list-group-item px-0 bg-transparent border-bottom">' +
+                                    '<div class="d-flex justify-content-between align-items-center mb-1">' +
+                                    '<span class="fw-bold text-dark">' + issue.issue_type + '</span>' +
+                                    '<span class="badge bg-soft-danger text-danger border border-danger border-opacity-10">' + issue.impact_minutes + ' min impact</span>' +
+                                    '</div>' +
+                                    '<p class="small text-muted mb-0">' + (issue.description || 'No additional details.') + '</p>' +
+                                    '</div>';
+                            }).join('') +
+                            '</div>' +
+                            '</div>';
+                    }
+
+                    // Quality Rejection HTML
+                    var rejectionHtml = '';
+                    if (entry.rejection) {
+                        var inspectedQty = parseFloat(entry.rejection.total_parts_inspected_qty) || 0;
+                        var rejectedQty = parseFloat(entry.rejection.rj_pcs) || 0;
+                        var qualityScore = inspectedQty > 0 ? ((inspectedQty - rejectedQty) / inspectedQty) * 100 : 0;
+                        if (qualityScore < 0) qualityScore = 0;
+                        rejectionHtml = '<div class="mt-4 pt-4 border-top">' +
+                            '<h6 class="fw-bold text-success border-bottom pb-2 mb-3">' +
+                            '<i class="fas fa-certificate me-2"></i>Quality Rejection Details' +
+                            '</h6>' +
+                            '<div class="row g-3">' +
+                            '<div class="col-md-6">' +
+                            '<div class="bg-soft-success p-3 rounded-3 border border-success border-opacity-10 h-100">' +
+                            '<p class="mb-2 d-flex justify-content-between"><span><strong>Inspected Qty:</strong></span> <span class="fw-bold">' + (entry.rejection.total_parts_inspected_qty || 0) + ' PCS</span></p>' +
+                            '<p class="mb-2 d-flex justify-content-between"><span><strong>Total Rejected:</strong></span> <span class="fw-bold text-danger">' + entry.rejection.rj_pcs + ' PCS</span></p>' +
+                            '<p class="mb-2 d-flex justify-content-between"><span><strong>Quality Score:</strong></span> <span class="fw-bold text-success">' + qualityScore.toFixed(1) + '%</span></p>' +
+                            '<p class="mb-2"><strong>Quality Remarks:</strong> <span class="text-muted">' + (entry.rejection.rejection_reason || 'N/A') + '</span></p>' +
+                            '<div class="p-2 bg-white rounded-2 mt-2 border border-success border-opacity-25">' +
+                            '<p class="mb-0 d-flex justify-content-between small"><span><strong>Weight/PCS:</strong></span> <span>' + entry.rejection.weight_per_pcs.toFixed(3) + ' kg</span></p>' +
+                            '<p class="mb-0 d-flex justify-content-between small"><span><strong>Total R/J Wt:</strong></span> <span class="fw-bold text-success">' + entry.rejection.rj_weight.toFixed(3) + ' kg</span></p>' +
+                            '</div>' +
+                            '</div>' +
+                            '</div>' +
+                            '<div class="col-md-6">' +
+                            '<div class="bg-light p-3 rounded-3 border border-secondary border-opacity-10 h-100">' +
+                            '<label class="text-muted small text-uppercase fw-bold mb-2 d-block">QC Inspection / Defects</label>' +
+                            '<div class="mb-2 small"><strong>Datetime:</strong> ' + formatDateTime(entry.rejection.rejection_datetime) + '</div>' +
+                            '<div class="mt-2">' +
+                            '<small class="fw-bold d-block mb-1">Defect Breakdown:</small>' +
+                            (entry.rejection.defects && entry.rejection.defects.length > 0 ?
+                                '<div class="list-group list-group-flush bg-transparent">' +
+                                entry.rejection.defects.map(function (d) {
+                                    return '<div class="list-group-item px-0 py-1 bg-transparent border-0 d-flex justify-content-between small">' +
+                                        '<span><i class="fas fa-bug text-danger me-1"></i>' + d.name + '</span>' +
+                                        '<span class="fw-bold">' + d.count + '</span>' +
+                                        '</div>';
+                                }).join('') + '</div>' : '<span class="text-muted small">No specific defects logged</span>') +
+                            '</div>' +
+                            '<div class="mt-3 pt-2 border-top">' +
+                            '<small class="fw-bold d-block mb-1">QC Supervisors:</small>' +
+                            '<div class="list-group list-group-flush bg-transparent">' +
+                            entry.rejection.supervisors.map(function (sup) {
+                                return '<div class="list-group-item px-0 py-1 bg-transparent border-0">' +
+                                    '<div class="d-flex justify-content-between small">' +
+                                    '<span><i class="fas fa-user-check text-success me-2"></i>' + sup.name + '</span>' +
+                                    '<span class="text-muted">' + (sup.start_time || '') + '-' + (sup.end_time || '') + '</span>' +
+                                    '</div>' +
+                                    '</div>';
+                            }).join('') +
+                            '</div>' +
+                            '</div>' +
+                            '</div>' +
+                            '</div>' +
+                            '<div class="mt-3 pt-3 border-top">' +
+                            '<div class="bg-white p-3 rounded-3 border border-info border-opacity-10 h-100">' +
+                            '<div class="d-flex justify-content-between align-items-center mb-2">' +
+                            '<span class="fw-semibold text-info small text-uppercase">Rework Summary</span>' +
+                            '<span class="badge bg-info bg-opacity-10 text-info">' + totalReworkQty.toFixed(0) + ' pcs</span>' +
+                            '</div>' +
+                            reworkDetailsHtml +
+                            '</div>' +
+                            '</div>' +
+                            '</div>' +
+                            '</div>';
+                    }
+
+                    // Operators Detailed HTML
+                    var operatorsHtml = '';
+                    if (entry.operators && entry.operators.length > 0) {
+                        operatorsHtml = '<div class="mt-4">' +
+                            '<h6 class="fw-bold text-primary border-bottom pb-2 mb-3">Machine Operators</h6>' +
+                            '<div class="row g-2">' +
+                            entry.operators.map(function (op) {
+                                return '<div class="col-md-6">' +
+                                    '<div class="p-2 border rounded bg-white shadow-sm d-flex justify-content-between align-items-center">' +
+                                    '<div><i class="fas fa-user text-primary me-2"></i><strong>' + op.name + '</strong></div>' +
+                                    '<div class="small text-muted">' + formatDateTime(op.start_time) + ' - ' + formatDateTime(op.end_time) + '</div>' +
+                                    '</div>' +
+                                    '</div>';
+                            }).join('') +
+                            '</div>' +
+                            '</div>';
+                    }
+
+                    // Production Supervisors
+                    if (entry.supervisors && entry.supervisors.length > 0) {
+                        operatorsHtml += '<div class="mt-4">' +
+                            '<h6 class="fw-bold text-success border-bottom pb-2 mb-3">Shift Supervisors</h6>' +
+                            '<div class="row g-2">' +
+                            entry.supervisors.map(function (sup) {
+                                return '<div class="col-md-6">' +
+                                    '<div class="p-2 border rounded bg-white shadow-sm d-flex justify-content-between align-items-center">' +
+                                    '<div><i class="fas fa-user-tie text-success me-2"></i><strong>' + sup.name + '</strong></div>' +
+                                    '<div class="small text-muted">' + formatDateTime(sup.start_time) + ' - ' + formatDateTime(sup.end_time) + '</div>' +
+                                    '</div>' +
+                                    '</div>';
+                            }).join('') +
+                            '</div>' +
+                            '</div>';
+                    }
+
+                    // Planned Downtime Detailed HTML
+                    var plannedDowntimeHtml = '';
+                    if (entry.downtime_entries && entry.downtime_entries.length > 0) {
+                        plannedDowntimeHtml = '<div class="mt-4">' +
+                            '<h6 class="fw-bold text-warning border-bottom pb-2 mb-3">Planned Downtime Breakdown</h6>' +
+                            '<div class="row g-2">' +
+                            entry.downtime_entries.map(function (dt) {
+                                return '<div class="col-md-6">' +
+                                    '<div class="p-2 border rounded bg-white shadow-sm d-flex justify-content-between align-items-center">' +
+                                    '<div><i class="fas fa-clock text-warning me-2"></i>' + dt.reason_name + '</div>' +
+                                    '<div class="fw-bold">' + dt.minutes + ' min</div>' +
+                                    '</div>' +
+                                    '</div>';
+                            }).join('') +
+                            '</div>' +
+                            '</div>';
+                    }
+
+                    // Process / Operation HTML
+                    var operationsHtml = '';
+                    if (entry.operations && entry.operations.length > 0) {
+                        operationsHtml = '<div class="mt-4">' +
+                            '<h6 class="fw-bold text-secondary border-bottom pb-2 mb-3">Operations / Processes</h6>' +
+                            '<div class="row g-2">' +
+                            entry.operations.map(function (op) {
+                                return '<div class="col-md-6">' +
+                                    '<div class="p-2 border rounded bg-white shadow-sm">' +
+                                    '<i class="fas fa-cogs text-secondary me-2"></i>' + (op.name || '-') +
+                                    '</div>' +
+                                    '</div>';
+                            }).join('') +
+                            '</div>' +
+                            '</div>';
+                    }
+
+                    // Performance Summary card update
+                    modalBody.innerHTML = ('<div class="row g-4">' +
+                        '<div class="col-md-6">' +
+                        '<div class="card border-0 shadow-none bg-light h-100">' +
+                        '<div class="card-body">' +
+                        '<label class="text-muted small text-uppercase fw-bold mb-3 d-block">Production Context</label>' +
+                        '<div class="mb-2 d-flex justify-content-between"><span><strong>Entry No:</strong></span> <span class="badge bg-secondary">' + (entry.entry_no || '-') + '</span></div>' +
+                        '<div class="mb-2 d-flex justify-content-between"><span><strong>Date:</strong></span> <span>' + entry.production_date + '</span></div>' +
+                        '<div class="mb-2 d-flex justify-content-between"><span><strong>Shift(s):</strong></span> <span class="badge bg-info">' + entry.shift + '</span></div>' +
+                        '<div class="mb-2 d-flex justify-content-between"><span><strong>Shed:</strong></span> <span class="fw-bold">' + (entry.shed_name || '-') + '</span></div>' +
+                        '<div class="mb-2 d-flex justify-content-between"><span><strong>Machine:</strong></span> <span class="fw-bold">' + entry.machine_name + '</span></div>' +
+                        '<div class="mt-3 pt-3 border-top">' +
+                        '<div class="text-muted small mb-1"><i class="fas fa-clock me-1"></i> Running Hours:</div>' +
+                        '<div class="fw-bold" style="font-size: 0.9rem;">' + formatDateTime(entry.start_time) + ' <i class="fas fa-long-arrow-alt-right mx-1 text-primary"></i> ' + formatDateTime(entry.end_time) + '</div>' +
+                        '</div>' +
+                        '</div>' +
+                        '</div>' +
+                        '</div>' +
+                        '<div class="col-md-6">' +
+                        '<div class="card border-0 shadow-none bg-light h-100">' +
+                        '<div class="card-body">' +
+                        '<label class="text-muted small text-uppercase fw-bold mb-3 d-block">Performance Summary</label>' +
+                        '<div class="mb-1 d-flex justify-content-between"><span>Total Run Time:</span> <span class="fw-bold">' + totalRunMins.toFixed(1) + ' m</span></div>' +
+                        '<div class="mb-1 d-flex justify-content-between"><span>Total Planned Downtime (Sum):</span> <span class="fw-bold text-danger">' + totalPlannedDowntimeSum.toFixed(1) + ' m</span></div>' +
+                        '<div class="mb-1 d-flex justify-content-between"><span>Ideal Cycle Time/Pc (Sum):</span> <span class="fw-bold text-primary">' + idealCyclePerPcSum.toFixed(2) + ' min</span></div>' +
+                        '<div class="mb-1 d-flex justify-content-between"><span>Total Ideal Time (Mins):</span> <span class="fw-bold text-info">' + totalIdealMins.toFixed(1) + ' m</span></div>' +
+                        '<div class="mb-1 d-flex justify-content-between"><span>Total Unaccounted Time (Mins):</span> <span class="fw-bold text-dark">' + totalUnaccountedMins.toFixed(1) + ' m</span></div>' +
+                        '<div class="mb-1 d-flex justify-content-between"><span>Rework Quantity:</span> <span class="fw-bold text-primary">' + (entry.rework_qty || 0) + ' pcs</span></div>' +
+                        '<div class="mb-3 d-flex justify-content-between"><span>Total Self Rejection PCS:</span> <span class="fw-bold text-danger">' + selfRejectionQty + ' pcs</span></div>' +
+                        '<div class="mb-1 d-flex justify-content-between"><span>Weight/PC:</span> <span class="fw-bold text-danger">' + selfRejectionWeightPerPc.toFixed(3) + ' kg</span></div>' +
+                        '<div class="mb-1 d-flex justify-content-between"><span>Total Self Rejection KGs:</span> <span class="fw-bold text-danger">' + totalSelfRejectionKg.toFixed(3) + ' kg</span></div>' +
+                        '<div class="mb-1 d-flex justify-content-between"><span>Total Machining Scrap:</span> <span class="fw-bold text-danger">' + machiningScrapKg.toFixed(3) + ' kg</span></div>' +
+                        '<div class="mb-3 d-flex justify-content-between"><span>Total Self Rejection (All):</span> <span class="fw-bold text-danger">' + totalSelfRejectionAllKg.toFixed(3) + ' kg</span></div>' +
+                        '<div class="mb-3 d-flex justify-content-between"><span>Total OK (Inc. Rework):</span> <span class="fw-bold text-success">' + (entry.total_ok || entry.actual_quantity) + ' pcs</span></div>' +
+                        '<div class="p-3 bg-white rounded-3 border d-flex justify-content-between align-items-center">' +
+                        '<span class="fw-bold">Efficiency:</span>' +
+                        '<span class="badge ' + getEfficiencyBadgeClass(entryEfficiency) + ' fs-5">' + entryEfficiency.toFixed(1) + '%</span>' +
+                        '</div>' +
+                        '</div>' +
+                        '</div>' +
+                        '</div>' +
+                        '<div class="col-12">' +
+                        '<div class="bg-light p-3 rounded-3 border">' +
+                        '<label class="text-muted small text-uppercase fw-bold mb-3 d-block">Job & Quantity Details</label>' +
+                        '<div class="row text-center g-3 mb-4">' +
+                        '<div class="col-md-3 border-end">' +
+                        '<p class="small text-muted mb-0">Shed</p>' +
+                        '<p class="fw-bold mb-0">' + (entry.shed_name || '-') + '</p>' +
+                        '</div>' +
+                        '<div class="col-md-3 border-end">' +
+                        '<p class="small text-muted mb-0">Customer</p>' +
+                        '<p class="fw-bold mb-0">' + entry.customer_name + '</p>' +
+                        '</div>' +
+                        '<div class="col-md-3 border-end">' +
+                        '<p class="small text-muted mb-0">Section / Length</p>' +
+                        '<p class="fw-bold mb-0">' + (entry.section_number || '-') + ' / ' + (entry.cutlength || '-') + 'mm</p>' +
+                        '</div>' +
+                        '<div class="col-md-3">' +
+                        '<p class="small text-muted mb-0">Variance</p>' +
+                        '<p class="fw-bold mb-0 ' + (entry.qty_variance >= 0 ? 'text-success' : 'text-danger') + '">' + (entry.qty_variance > 0 ? '+' : '') + entry.qty_variance + ' pcs (' + entry.qty_variance_percent.toFixed(1) + '%)</p>' +
+                        '</div>' +
+                        '</div>' +
+                        '<div class="row g-3 text-center">' +
+                        '<div class="col-md-3">' +
+                        '<div class="p-2 border rounded-3 bg-white">' +
+                        '<div class="small text-muted">Planned</div>' +
+                        '<div class="fs-4 fw-bold text-secondary">' + entry.planned_quantity + '</div>' +
+                        '</div>' +
+                        '</div>' +
+                        '<div class="col-md-3">' +
+                        '<div class="p-2 border rounded-3 bg-white">' +
+                        '<div class="small text-muted">Actual OK</div>' +
+                        '<div class="fs-4 fw-bold text-primary">' + entry.actual_quantity + '</div>' +
+                        '</div>' +
+                        '</div>' +
+                        '<div class="col-md-3">' +
+                        '<div class="p-2 border rounded-3 bg-white">' +
+                        '<div class="small text-muted">Total Self Rejection PCS</div>' +
+                        '<div class="fs-4 fw-bold text-danger">' + selfRejectionQty + '</div>' +
+                        '</div>' +
+                        '</div>' +
+                        '<div class="col-md-3">' +
+                        '<div class="p-2 border rounded-3 bg-white">' +
+                        '<div class="small text-muted">Total OK (Inc. Rework)</div>' +
+                        '<div class="fs-4 fw-bold text-success">' + (entry.total_ok || entry.actual_quantity) + '</div>' +
+                        '</div>' +
+                        '</div>' +
+                        '</div>' +
+                        '</div>' +
+                        '</div>' +
+                        '<div class="col-12">' +
+                        '<div class="bg-light p-3 rounded-3 border mb-3">' +
+                        '<label class="text-muted small text-uppercase fw-bold mb-3 d-block">Production Self Rejection Breakdown</label>' +
+                        selfRejectionDetailsHtml +
+                        '</div>' +
+                        '</div>' +
+                        '<div class="col-12">' +
+                        operatorsHtml +
+                        operationsHtml +
+                        plannedDowntimeHtml +
+                        issuesHtml +
+                        rejectionHtml +
+                        '<div class="mt-4"><h6 class="fw-bold border-bottom pb-2">Remarks</h6><p class="mb-0 text-muted">' + (entry.remarks || 'N/A') + '</p></div>' +
+                        '<div class="mt-4 pt-3 border-top d-flex justify-content-between align-items-center">' +
+                        '<div>' +
+                        '<p class="small text-muted mb-0">Logged by: <span class="fw-bold">' + entry.created_by + '</span></p>' +
+                        '<p class="small text-muted mb-0 fst-italic">Logged on ' + new Date(entry.created_at).toLocaleString() + '</p>' +
+                        '</div>' +
+                        '<button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Close</button>' +
+                        '</div>' +
+                        '</div>');
+                })
+                .catch(function (error) {
+                    console.error('Error fetching entry details:', error);
+                    modalBody.innerHTML = ('<div class="text-center py-5">' +
+                        '<i class="fas fa-exclamation-triangle text-warning fa-3x mb-3"></i>' +
+                        '<p class="text-muted">Error loading details: ' + error.message + '</p>' +
+                        '<button class="btn btn-sm btn-outline-primary mt-2" onclick="location.reload()">Retry</button>' +
+                        '</div>');
+                });
+        }
+
+        // jQuery delegated handler (when available)
+        if (window.jQuery) {
+            $(document).off('click', '.view-entry-btn, .view-entry-full-btn').on('click', '.view-entry-btn, .view-entry-full-btn', function () {
+                var entryId = this.getAttribute('data-id');
+                openEntryDetail(entryId);
+            });
+        }
+
+        // Native delegated fallback
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest('.view-entry-btn, .view-entry-full-btn');
+            if (!btn) return;
+            e.preventDefault();
+            var entryId = btn.getAttribute('data-id');
+            openEntryDetail(entryId);
+        });
+    })();
+</script>
+<style>
+    .bg-soft-danger {
+        background-color: rgba(220, 53, 69, 0.1);
+    }
+</style>
+{% endblock %}

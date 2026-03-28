@@ -1,0 +1,289 @@
+{% extends "base.html" %}
+
+{% block page_title %}Shift Analysis{% endblock %}
+{% block page_subtitle %}Shift-wise Performance Metrics{% endblock %}
+
+{% block title %}Shift Performance Analysis{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 fw-bold mb-0">Shift Performance</h1>
+    <span class="badge bg-soft-secondary text-secondary border px-3 py-2">
+        <i class="fas fa-history me-2"></i> Past {{ period_days }} Days
+    </span>
+</div>
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-2 align-items-end" id="dashFilterForm">
+            <div class="col-md-2"><label class="form-label small mb-1">Start Date & Time</label><input type="datetime-local" class="form-control" name="start_date" value="{{ start_datetime_value }}"></div>
+            <div class="col-md-2"><label class="form-label small mb-1">End Date & Time</label><input type="datetime-local" class="form-control" name="end_date" value="{{ end_datetime_value }}"></div>
+            <div class="col-md-2"><label class="form-label small mb-1">Entry No</label><input type="text" class="form-control" name="entry_no" value="{{ request.args.get('entry_no', '') }}" placeholder="MS-2026-0001"></div>
+            <div class="col-md-2"><label class="form-label small mb-1">Employee Code</label><input type="text" class="form-control" name="emp_code" value="{{ request.args.get('emp_code', '') }}" placeholder="E1234"></div>
+            <div class="col-md-2"><label class="form-label small mb-1">Machine</label><select class="form-select" id="machine_id" name="machine_id"><option value="">All</option>{% for m in filter_machines %}<option value="{{ m.id }}" {% if request.args.get('machine_id')==m.id|string %}selected{% endif %}>{{ m.machine_name }}</option>{% endfor %}</select></div>
+            <div class="col-md-2"><label class="form-label small mb-1">Customer</label><select class="form-select" id="customer_id" name="customer_id"><option value="">All</option>{% for c in filter_customers %}<option value="{{ c.id }}" {% if request.args.get('customer_id')==c.id|string %}selected{% endif %}>{{ c.customer_name }}</option>{% endfor %}</select></div>
+            <div class="col-md-2"><label class="form-label small mb-1">Section</label><select class="form-select" id="section_number" name="section_number" data-selected="{{ request.args.get('section_number', request.args.get('section', '')) }}"><option value="">All</option>{% for s in filter_sections %}<option value="{{ s.section_number }}" {% if request.args.get('section_number', request.args.get('section', ''))==s.section_number %}selected{% endif %}>{{ s.section_number }}</option>{% endfor %}</select></div>
+            <div class="col-md-2"><label class="form-label small mb-1">Cut Length</label><select class="form-select" id="cut_length" name="cut_length" data-selected="{{ request.args.get('cut_length', request.args.get('cutlength', '')) }}"><option value="">All</option>{% for cl in filter_cut_lengths %}<option value="{{ cl.cut_length }}" {% if request.args.get('cut_length', request.args.get('cutlength', ''))==cl.cut_length|string %}selected{% endif %}>{{ cl.cut_length }}</option>{% endfor %}</select></div>
+            <div class="col-md-2"><label class="form-label small mb-1">Process</label><select class="form-select" id="operation_type_id" name="operation_type_id" data-selected="{{ request.args.get('operation_type_id', '') }}"><option value="">All</option>{% for op in filter_operations %}<option value="{{ op.id }}" {% if request.args.get('operation_type_id')==op.id|string %}selected{% endif %}>{{ op.operation_name }}</option>{% endfor %}</select></div>
+            <div class="col-md-2"><label class="form-label small mb-1">Shift</label><select class="form-select" name="shift"><option value="">All</option><option value="A" {% if request.args.get('shift')=='A' %}selected{% endif %}>A</option><option value="B" {% if request.args.get('shift')=='B' %}selected{% endif %}>B</option><option value="C" {% if request.args.get('shift')=='C' %}selected{% endif %}>C</option></select></div>
+            <div class="col-md-2"><button class="btn btn-primary w-100" type="submit">Apply</button></div>
+            <div class="col-md-2"><a class="btn btn-outline-secondary w-100" href="{{ url_for('dashboard.shift_analysis_dashboard') }}">Reset</a></div>
+        </form>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <!-- Shift Comparison Cards -->
+    {% set metrics = shift_metrics | from_json %}
+    {% for shift, data in metrics.items() %}
+    <div class="col-md-4">
+        <div class="card h-100 border-top-primary">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold mb-0">Shift {{ shift }}</h5>
+                    <span class="badge badge-efficiency {{ data.efficiency | getEfficiencyBadge }} rounded-pill">
+                        {{ data.efficiency }}% Eff.
+                    </span>
+                </div>
+                <div class="row g-2">
+                    <div class="col-6">
+                        <p class="small text-muted mb-0">Actual Qty</p>
+                        <p class="fw-bold fs-5">{{ "{:,}".format(data.actual) }}</p>
+                    </div>
+                    <div class="col-6">
+                        <p class="small text-muted mb-0">Planned Qty</p>
+                        <p class="fw-bold fs-5">{{ "{:,}".format(data.planned) }}</p>
+                    </div>
+                    <div class="col-6">
+                        <p class="small text-muted mb-0">Downtime</p>
+                        <p class="text-warning fw-bold">{{ data.downtime }} min</p>
+                    </div>
+                    <div class="col-6">
+                        <p class="small text-muted mb-0">Entries</p>
+                        <p class="fw-bold">{{ data.entries }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-chart-pie me-2 text-primary"></i> Shift Contribution</span>
+                <button type="button" class="btn btn-sm btn-outline-secondary chart-data-btn"
+                    data-chart-title="Shift Contribution Data"
+                    data-chart-columns='[{"key":"shift","label":"Shift"},{"key":"planned","label":"Planned"},{"key":"actual","label":"Actual"},{"key":"efficiency","label":"Efficiency %"},{"key":"downtime","label":"Downtime (min)"},{"key":"variance","label":"Actual vs Plan"},{"key":"avg_downtime_per_entry","label":"Avg Downtime / Entry"},{"key":"entries","label":"Entries"}]'
+                    data-chart-rows='{{ shift_table | tojson | safe }}'>
+                    View Data
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <div class="chart-fixed">
+                            <canvas id="shiftPieChart"></canvas>
+                        </div>
+                        <div id="shiftPieInsight" class="alert alert-light border mt-3 mb-0 small"></div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="chart-fixed">
+                            <canvas id="shiftRadarChart"></canvas>
+                        </div>
+                        <div id="shiftRadarInsight" class="alert alert-light border mt-3 mb-0 small"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mt-1">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <span><i class="fas fa-users me-2 text-success"></i>Employee Performance Sidebar (Per Shift)</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead><tr><th class="ps-3">Employee</th><th>Role</th><th>Shift</th><th>Assignments</th><th>Planned Qty</th><th>Actual Qty</th><th>Final OK</th><th>Rework</th><th>Total Self Rejection PCS</th><th>Quality R/J</th><th>Efficiency</th><th>Performance</th></tr></thead>
+                        <tbody>
+                            {% for emp in employee_performance %}
+                            <tr>
+                                <td class="ps-3">{{ emp.name }} <small class="text-muted">({{ emp.code }})</small></td>
+                                <td>{{ emp.role }}</td>
+                                <td>{{ emp.shift }}</td>
+                                <td>{{ emp.assignments }}</td>
+                                <td class="text-muted text-end">{{ emp.planned_qty }}</td>
+                                <td class="fw-bold">{{ emp.actual_qty }}</td>
+                                <td class="text-success fw-bold">{{ emp.total_ok }}</td>
+                                <td class="text-muted text-end">{{ emp.rework_qty }}</td>
+                                <td class="text-muted text-end">{{ emp.self_rejection_qty }}</td>
+                                <td class="text-muted text-end">{{ emp.quality_rejections }}</td>
+                                <td class="text-end">{{ emp.efficiency }}%</td>
+                                <td class="text-end">{{ emp.performance }}%</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="12" class="text-center text-muted py-3">No employee rows for selected filters.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="px-3 py-3 border-top bg-light small text-muted">
+                    Efficiency shows production output against plan: <strong>Actual Qty / Planned Qty</strong>.
+                    Performance shows usable output against plan: <strong>Final OK / Planned Qty</strong>.
+                    Final OK already reflects the current remaining quality rejection balance, while rework is shown separately for reference.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden data store (resolves linting errors) -->
+<div id="shiftDataStore" class="d-none" data-metrics='{{ shift_metrics | safe }}'></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (() => {
+    const dataStore = document.getElementById('shiftDataStore');
+    const shiftData = JSON.parse(dataStore.dataset.metrics || '{}');
+    const labels = Object.keys(shiftData);
+    const actuals = labels.map(l => shiftData[l].actual);
+    const effs = labels.map(l => shiftData[l].efficiency);
+    const downtimes = labels.map(l => shiftData[l].downtime);
+    const sum = (arr) => (arr || []).reduce((a, b) => a + (Number(b) || 0), 0);
+    const maxIdx = (arr) => {
+        if (!arr || !arr.length) return -1;
+        let idx = 0;
+        for (let i = 1; i < arr.length; i++) if ((Number(arr[i]) || 0) > (Number(arr[idx]) || 0)) idx = i;
+        return idx;
+    };
+    const chartReady = !!window.Chart;
+    if (!chartReady) {
+        const pieInsight = document.getElementById('shiftPieInsight');
+        const radarInsight = document.getElementById('shiftRadarInsight');
+        if (pieInsight) pieInsight.textContent = 'Chart library not loaded.';
+        if (radarInsight) radarInsight.textContent = 'Chart library not loaded.';
+    }
+    const machineFilter = document.getElementById('machine_id');
+    const customerFilter = document.getElementById('customer_id');
+    const sectionFilter = document.getElementById('section_number');
+    const cutLengthFilter = document.getElementById('cut_length');
+    const operationFilter = document.getElementById('operation_type_id');
+    function resetSelect(el, label) { if (!el) return; el.innerHTML = ''; el.add(new Option(label, '')); }
+    function fetchJson(url) { return fetch(url).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }); }
+    function loadAllOps() {
+        if (!operationFilter) return Promise.resolve();
+        return fetchJson('/master/api/operations').then(rows => {
+            resetSelect(operationFilter, 'All');
+            (rows || []).forEach(op => operationFilter.add(new Option(op.operation_name, op.id)));
+            const v = operationFilter.dataset.selected; if (v) operationFilter.value = v;
+        }).catch(() => { });
+    }
+    function loadSections() {
+        if (!customerFilter || !sectionFilter) return Promise.resolve();
+        const cid = customerFilter.value;
+        if (!cid) { resetSelect(sectionFilter, 'All'); resetSelect(cutLengthFilter, 'All'); return loadAllOps(); }
+        return fetchJson('/master/api/sections/' + encodeURIComponent(cid)).then(rows => {
+            resetSelect(sectionFilter, 'All'); (rows || []).forEach(s => sectionFilter.add(new Option(s.number, s.number)));
+            const sv = sectionFilter.dataset.selected; if (sv) sectionFilter.value = sv; sectionFilter.dataset.selected = '';
+            return loadCutLengths();
+        }).catch(() => { resetSelect(sectionFilter, 'All'); resetSelect(cutLengthFilter, 'All'); });
+    }
+    function loadCutLengths() {
+        if (!customerFilter || !sectionFilter || !cutLengthFilter) return Promise.resolve();
+        const cid = customerFilter.value; const sn = sectionFilter.value;
+        if (!cid || !sn) { resetSelect(cutLengthFilter, 'All'); return loadAllOps(); }
+        return fetchJson('/master/api/sections/' + encodeURIComponent(cid)).then(rows => {
+            const match = (rows || []).find(s => String(s.number) === String(sn)); if (!match) throw new Error('No section');
+            return fetchJson('/master/api/cut-lengths/' + encodeURIComponent(match.id)).then(cls => ({ match, cls }));
+        }).then(({ match, cls }) => {
+            resetSelect(cutLengthFilter, 'All'); (cls || []).forEach(cl => cutLengthFilter.add(new Option(String(cl.length), String(cl.length))));
+            const cv = cutLengthFilter.dataset.selected; if (cv) cutLengthFilter.value = cv; cutLengthFilter.dataset.selected = '';
+            const mid = machineFilter ? machineFilter.value : ''; const clMatch = (cls || []).find(x => String(x.length) === String(cutLengthFilter.value));
+            if (!mid || !cid || !sn || !clMatch) return loadAllOps();
+            return fetchJson('/master/api/operations/by-combo?machine_id=' + encodeURIComponent(mid) + '&customer_id=' + encodeURIComponent(cid) + '&section_id=' + encodeURIComponent(match.id) + '&cut_length_id=' + encodeURIComponent(clMatch.id))
+                .then(ops => {
+                    if (!ops || !ops.length) return loadAllOps();
+                    resetSelect(operationFilter, 'All');
+                    ops.forEach(op => operationFilter.add(new Option(op.operation_name, op.id || op.operation_type_id)));
+                    const ov = operationFilter.dataset.selected; if (ov) operationFilter.value = ov;
+                }).catch(() => loadAllOps());
+        }).catch(() => { resetSelect(cutLengthFilter, 'All'); });
+    }
+    if (customerFilter) customerFilter.addEventListener('change', loadSections);
+    if (sectionFilter) sectionFilter.addEventListener('change', loadCutLengths);
+    if (cutLengthFilter) cutLengthFilter.addEventListener('change', loadCutLengths);
+    if (machineFilter) machineFilter.addEventListener('change', loadCutLengths);
+    if (customerFilter && customerFilter.value) loadSections(); else loadAllOps();
+
+    // Pie Chart
+    if (chartReady) new Chart(document.getElementById('shiftPieChart'), {
+        type: 'doughnut',
+        data: {
+            labels: labels.map(l => 'Shift ' + l),
+            datasets: [{
+                data: actuals,
+                backgroundColor: [
+                    'rgba(59, 130, 246, 0.8)',
+                    'rgba(16, 185, 129, 0.8)',
+                    'rgba(245, 158, 11, 0.8)'
+                ],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: { display: true, text: 'Production Volume by Shift' }
+            }
+        }
+    });
+
+    // Radar Chart (Efficiency vs Downtime)
+    // Normalized for comparison
+    if (chartReady) new Chart(document.getElementById('shiftRadarChart'), {
+        type: 'radar',
+        data: {
+            labels: labels.map(l => 'Shift ' + l),
+            datasets: [{
+                label: 'Efficiency %',
+                data: effs,
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                r: { min: 0, max: 100 }
+            }
+        }
+    });
+    const totalActual = sum(actuals);
+    const topVolIdx = maxIdx(actuals);
+    const topEffIdx = maxIdx(effs);
+    const totalDowntime = sum(downtimes);
+    const pieInsight = document.getElementById('shiftPieInsight');
+    if (pieInsight) {
+        const topVol = topVolIdx >= 0 ? (Number(actuals[topVolIdx]) || 0) : 0;
+        const topVolShift = topVolIdx >= 0 ? labels[topVolIdx] : 'N/A';
+        const share = totalActual > 0 ? (topVol / totalActual) * 100 : 0;
+        pieInsight.textContent = `Total actual output is ${totalActual.toFixed(0)} units. Shift ${topVolShift} contributes the most at ${topVol.toFixed(0)} units (${share.toFixed(1)}%).`;
+    }
+    const radarInsight = document.getElementById('shiftRadarInsight');
+    if (radarInsight) {
+        const bestShift = topEffIdx >= 0 ? labels[topEffIdx] : 'N/A';
+        const bestEff = topEffIdx >= 0 ? (Number(effs[topEffIdx]) || 0) : 0;
+        radarInsight.textContent = `Best efficiency is Shift ${bestShift} at ${bestEff.toFixed(1)}%. Combined downtime across shown shifts is ${totalDowntime.toFixed(0)} minutes.`;
+    }
+    })();
+</script>
+{% endblock %}

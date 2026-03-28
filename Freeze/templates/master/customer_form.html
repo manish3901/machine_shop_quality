@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block page_title %}{{ 'Edit' if customer else 'New' }} Customer{% endblock %}
+{% block page_subtitle %}Manage Customer Details{% endblock %}
+{% block title %}Add Customer - Machine Shop{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-xl-6 col-lg-8 col-md-10">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">{{ 'Edit' if customer else 'Add' }} Customer</h6>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Customer Name</label>
+                        <input type="text" class="form-control" name="customer_name"
+                            value="{{ customer.customer_name if customer }}" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Customer Code</label>
+                        <input type="text" class="form-control" name="customer_code"
+                            value="{{ customer.customer_code if customer }}">
+                    </div>
+
+
+                    <div class="mb-3">
+                        <label class="form-label">Status</label>
+                        <select class="form-select" name="status">
+                            <option value="Active" {{ 'selected' if customer and customer.status=='Active' }}>Active
+                            </option>
+                            <option value="Inactive" {{ 'selected' if customer and customer.status=='Inactive' }}>
+                                Inactive</option>
+                        </select>
+                    </div>
+
+                    {% if not customer %}
+                    <hr class="my-4">
+                    <h6 class="text-muted mb-3"><i class="fas fa-plus-circle me-1"></i> Initial Production Details</h6>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Initial Section Number <span
+                                        class="text-danger">*</span></label>
+                                <input type="text" class="form-control" name="initial_section"
+                                    placeholder="e.g. SEC-001" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Initial Cut Length (mm) <span
+                                        class="text-danger">*</span></label>
+                                <input type="number" step="0.01" class="form-control" name="initial_length"
+                                    placeholder="e.g. 1000" required>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('master_data.list_customers') }}" class="btn btn-light me-md-2">Cancel</a>
+                        <button type="submit" class="btn btn-primary">Save Customer</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

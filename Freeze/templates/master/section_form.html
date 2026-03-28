@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if section else 'Add' }} Section - {{ customer.customer_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <nav aria-label="breadcrumb" class="mb-4">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('master_data.list_customers') }}">Customers</a></li>
+                    <li class="breadcrumb-item"><a
+                            href="{{ url_for('master_data.manage_sections', customer_id=customer.id) }}">{{
+                            customer.customer_name }}</a></li>
+                    <li class="breadcrumb-item active">{{ 'Edit' if section else 'Add' }} Section</li>
+                </ol>
+            </nav>
+
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-primary text-white py-3">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-layer-group me-2"></i>
+                        {{ 'Edit Section Number' if section else 'Add New Section' }}
+                    </h5>
+                </div>
+                <div class="card-body p-4">
+                    <form
+                        action="{{ url_for('master_data.edit_section', section_id=section.id) if section else url_for('master_data.add_section', customer_id=customer.id) }}"
+                        method="POST">
+                        <div class="mb-4">
+                            <label for="section_number" class="form-label fw-bold">Section Number</label>
+                            <input type="text" class="form-control form-control-lg" id="section_number"
+                                name="section_number" value="{{ section.section_number if section else '' }}"
+                                placeholder="e.g. MEDIT-40" required>
+                            <div class="form-text mt-2 text-muted">Enter the unique identifier/code for this profile
+                                section.</div>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center mt-5">
+                            <a href="{{ url_for('master_data.manage_sections', customer_id=customer.id) }}"
+                                class="btn btn-outline-secondary px-4">
+                                <i class="fas fa-arrow-left me-2"></i> Back
+                            </a>
+                            <button type="submit" class="btn btn-primary px-5 shadow-sm">
+                                <i class="fas fa-save me-2"></i> Save Changes
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

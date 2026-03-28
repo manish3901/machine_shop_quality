@@ -1,0 +1,1150 @@
+{% extends "base.html" %}
+
+{% block title %}Rejection Entry Form - Machine Shop{% endblock %}
+
+{% block page_title %}Daily Rejection Report{% endblock %}
+{% block page_subtitle %}Enter rejection data for quality control tracking{% endblock %}
+
+{% block extra_css %}
+<style>
+    .quality-gauge-container {
+        width: 100px;
+        height: 60px;
+        position: relative;
+        margin: 0 auto;
+    }
+
+    .gauge-bg {
+        fill: none;
+        stroke: #e9ecef;
+        stroke-width: 10;
+        stroke-linecap: round;
+    }
+
+    .gauge-fill {
+        fill: none;
+        stroke-width: 10;
+        stroke-linecap: round;
+        transition: stroke-dasharray 0.5s ease, stroke 0.5s ease;
+    }
+
+    .status-green {
+        stroke: #198754;
+    }
+
+    .status-yellow {
+        stroke: #ffc107;
+    }
+
+    .status-red {
+        stroke: #dc3545;
+    }
+
+    /* Mobile-first improvements */
+    .select2-container {
+        width: 100% !important;
+    }
+
+    .table-responsive {
+        -webkit-overflow-scrolling: touch;
+    }
+
+    @media (max-width: 576px) {
+        .card-header {
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .mobile-tight-pad {
+            padding: 1rem !important;
+        }
+
+        #mobileSubmitBar {
+            position: sticky;
+            bottom: 0;
+            z-index: 1020;
+            background: #fff;
+            padding: 0.75rem;
+            margin-left: -1rem;
+            margin-right: -1rem;
+            border-top: 1px solid rgba(0, 0, 0, 0.08);
+        }
+
+        #mobileSubmitBar .btn {
+            width: 100%;
+        }
+
+        #defectTable {
+            min-width: 560px;
+        }
+
+        /* Stack code/name nicely; keep table scroll only if needed */
+        #supervisorTable {
+            min-width: 0;
+        }
+
+        #supervisorTable .supervisor-code,
+        #supervisorTable .supervisor-name-display {
+            width: 100%;
+        }
+    }
+
+    .prod-summary-card {
+        background: linear-gradient(180deg, rgba(13, 110, 253, 0.08), rgba(13, 110, 253, 0.03));
+    }
+
+    .prod-meta-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0.75rem;
+    }
+
+    .prod-stat-grid {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 0.75rem;
+    }
+
+    .prod-detail-card,
+    .prod-stat-card {
+        background: rgba(255, 255, 255, 0.92);
+        border: 1px solid rgba(13, 110, 253, 0.12);
+        border-radius: 0.9rem;
+    }
+
+    .prod-detail-card {
+        padding: 0.7rem 0.85rem;
+        min-height: 100%;
+    }
+
+    .prod-stat-card {
+        padding: 0.8rem 0.9rem;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    }
+
+    .prod-detail-label,
+    .prod-stat-label {
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #6c757d;
+        font-weight: 700;
+    }
+
+    .prod-detail-value {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #0f172a;
+        line-height: 1.25;
+        margin-top: 0.2rem;
+        word-break: break-word;
+    }
+
+    .prod-detail-value.compact-list {
+        font-size: 0.88rem;
+    }
+
+    .prod-stat-value {
+        font-size: 1.2rem;
+        font-weight: 800;
+        line-height: 1.1;
+        color: #0d6efd;
+        margin-top: 0.35rem;
+    }
+
+    .prod-stat-card.final-ok .prod-stat-value {
+        color: #198754;
+    }
+
+    .prod-stat-card.rejection .prod-stat-value {
+        color: #dc3545;
+    }
+
+    .prod-stat-card.rework .prod-stat-value {
+        color: #fd7e14;
+    }
+
+    .prod-stat-card.scrap .prod-stat-value {
+        color: #6f42c1;
+    }
+
+    .prod-stat-note {
+        font-size: 0.72rem;
+        color: #6c757d;
+        margin-top: 0.2rem;
+    }
+
+    .prod-inline-note {
+        font-size: 0.74rem;
+        color: #6c757d;
+    }
+
+    @media (max-width: 991.98px) {
+        .prod-meta-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .prod-stat-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 576px) {
+        .prod-meta-grid,
+        .prod-stat-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-12">
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h5 class="mb-0 text-primary fw-bold"><i class="fas fa-microscope me-2"></i>Quality Rejection Report
+                </h5>
+                {% if production_entry %}
+                <span class="badge bg-soft-primary text-primary border border-primary border-opacity-25 px-3 py-2">
+                    <i class="fas fa-link me-1"></i>Linked to: {{ production_entry.entry_no }}
+                </span>
+                {% endif %}
+            </div>
+            <div class="card-body p-3 p-md-4">
+                <form method="POST"
+                    action="{{ url_for('rejection.rejection_form', production_id=production_entry.id if production_entry else '') }}"
+                    id="rejectionForm">
+                    <input type="hidden" name="production_entry_id"
+                        value="{{ production_entry.id if production_entry else '' }}">
+
+                    {% if production_entry %}
+                    <input type="hidden" name="shift" value="{{ production_entry.shift }}">
+                    <input type="hidden" name="customer_id" value="{{ production_entry.customer_id }}">
+                    <input type="hidden" name="section_number" value="{{ production_entry.section_number }}">
+                    <input type="hidden" name="length" value="{{ production_entry.cutlength }}">
+                    <input type="hidden" id="producedOkQtyLimit" value="{{ production_entry.total_ok_quantity or 0 }}">
+                    {% endif %}
+
+                    <!-- Section 1: Production Details (Read-only) -->
+                    {% if production_entry %}
+                    {% set runtime_mins = production_entry.total_time_taken_minutes or 0 %}
+                    {% set downtime_mins = production_entry.downtime_minutes or 0 %}
+                    {% set available_mins = runtime_mins + downtime_mins %}
+                    {% set ideal_cycle_per_pc = production_entry.ideal_cycle_time or 0 %}
+                    {% set computed_ideal_mins = ((production_entry.actual_quantity or 0) * ideal_cycle_per_pc / 60) if ideal_cycle_per_pc else 0 %}
+                    {% set ideal_time_mins = production_entry.total_ideal_time_minutes if (production_entry.total_ideal_time_minutes or 0) > 0 else computed_ideal_mins %}
+                    {% set unaccounted_mins = runtime_mins - ideal_time_mins %}
+                    {% set self_rejection_weight_per_pc = production_entry.self_rejection_weight_per_pcs or 0 %}
+                    {% set self_rejection_total_pcs = production_entry.self_rejection_qty or 0 %}
+                    {% set machining_scrap_kg = production_entry.machining_scrap_weight_kg or 0 %}
+                    {% set total_self_rejection_kg = self_rejection_weight_per_pc * self_rejection_total_pcs %}
+                    {% set total_self_rejection_all_kg = total_self_rejection_kg + machining_scrap_kg %}
+                    <div class="rounded-3 p-3 p-md-3 mb-4 border border-primary border-opacity-25 prod-summary-card mobile-tight-pad">
+                        <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2 flex-wrap gap-2">
+                            <h6 class="text-uppercase text-primary small fw-bold mb-0">
+                                <i class="fas fa-industry me-2"></i>Linked Production Details (Read Only)
+                            </h6>
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <span class="badge bg-white text-primary border border-primary border-opacity-25 px-3 py-2">
+                                    Entry: {{ production_entry.entry_no }}
+                                </span>
+                                <button type="button" id="toggleProdMoreBtn" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-chevron-down me-1"></i>Show More
+                                </button>
+                            </div>
+                        </div>
+                        <div class="prod-meta-grid mb-3">
+                            <div class="prod-detail-card">
+                                <div class="prod-detail-label">Production</div>
+                                <div class="prod-detail-value">{{ production_entry.production_date }} | {{ production_entry.shift }}</div>
+                                <div class="prod-inline-note">{{ production_entry.start_time }} to {{ production_entry.end_time }}</div>
+                            </div>
+                            <div class="prod-detail-card">
+                                <div class="prod-detail-label">Machine Line</div>
+                                <div class="prod-detail-value">{{ production_entry.machine.machine_name if production_entry.machine else '' }}</div>
+                                <div class="prod-inline-note">{{ production_entry.machine.shed.shed_name if production_entry.machine and production_entry.machine.shed else '' }}</div>
+                            </div>
+                            <div class="prod-detail-card">
+                                <div class="prod-detail-label">Job</div>
+                                <div class="prod-detail-value">{{ production_entry.customer.customer_name if production_entry.customer else '' }}</div>
+                                <div class="prod-inline-note">{{ production_entry.section_number }} | {{ production_entry.cutlength }} mm</div>
+                            </div>
+                            <div class="prod-detail-card">
+                                <div class="prod-detail-label">Operation / Process</div>
+                                <div class="prod-detail-value compact-list">{% for op in production_entry.operations %}{{ op.operation_type.operation_name if op.operation_type else '' }}{% if not loop.last %}, {% endif %}{% endfor %}</div>
+                            </div>
+                        </div>
+
+                        <div class="prod-stat-grid">
+                            <div class="prod-stat-card">
+                                <div class="prod-stat-label">Planned Qty</div>
+                                <div class="prod-stat-value">{{ production_entry.planned_quantity }}</div>
+                            </div>
+                            <div class="prod-stat-card">
+                                <div class="prod-stat-label">Actual OK</div>
+                                <div class="prod-stat-value">{{ production_entry.actual_quantity }}</div>
+                            </div>
+                            <div class="prod-stat-card rejection">
+                                <div class="prod-stat-label">Quality Rej</div>
+                                <div class="prod-stat-value">{{ production_entry.rejection.rj_pcs if production_entry.rejection else 0 }}</div>
+                            </div>
+                            <div class="prod-stat-card rework">
+                                <div class="prod-stat-label">Rework</div>
+                                <div class="prod-stat-value">{{ production_entry.rework_qty or 0 }}</div>
+                            </div>
+                            <div class="prod-stat-card final-ok">
+                                <div class="prod-stat-label">Final OK</div>
+                                <div class="prod-stat-value">{{ production_entry.total_ok_quantity }}</div>
+                                <div class="prod-stat-note">Produced OK minus remaining quality rejects</div>
+                            </div>
+                            <div class="prod-stat-card">
+                                <div class="prod-stat-label">Efficiency</div>
+                                <div class="prod-stat-value">{{ '%.2f'|format(production_entry.efficiency or 0) }}%</div>
+                            </div>
+                            <div class="prod-stat-card scrap">
+                                <div class="prod-stat-label">Self Rej PCS</div>
+                                <div class="prod-stat-value">{{ self_rejection_total_pcs }}</div>
+                            </div>
+                            <div class="prod-stat-card">
+                                <div class="prod-stat-label">Wt / PC</div>
+                                <div class="prod-stat-value">{{ '%.3f'|format(self_rejection_weight_per_pc) }}</div>
+                                <div class="prod-stat-note">kg per piece</div>
+                            </div>
+                            <div class="prod-stat-card">
+                                <div class="prod-stat-label">Self Rej Kg</div>
+                                <div class="prod-stat-value">{{ '%.3f'|format(total_self_rejection_kg) }}</div>
+                            </div>
+                            <div class="prod-stat-card">
+                                <div class="prod-stat-label">Machining Scrap</div>
+                                <div class="prod-stat-value">{{ '%.3f'|format(machining_scrap_kg) }}</div>
+                                <div class="prod-stat-note">kg</div>
+                            </div>
+                            <div class="prod-stat-card">
+                                <div class="prod-stat-label">Total Scrap</div>
+                                <div class="prod-stat-value">{{ '%.3f'|format(total_self_rejection_all_kg) }}</div>
+                                <div class="prod-stat-note">kg incl. machining scrap</div>
+                            </div>
+                        </div>
+
+                            <div id="prodMoreDetails" class="row g-3 d-none">
+                                <div class="col-md-3">
+                                    <label class="form-label small text-muted fw-bold">Runtime / Operating Time (Mins)</label>
+                                    <input type="text" class="form-control bg-white" value="{{ runtime_mins }}" readonly>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small text-muted fw-bold">Total Available Time (Mins)</label>
+                                    <input type="text" class="form-control bg-white" value="{{ available_mins }}" readonly>
+                                    <div class="form-text small text-muted">Runtime + planned downtime</div>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small text-muted fw-bold">Ideal Cycle Time / Pc (Sec)</label>
+                                    <input type="text" class="form-control bg-white" value="{{ '%.2f'|format(ideal_cycle_per_pc) }}" readonly>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small text-muted fw-bold">Ideal Time It Should Take (Mins)</label>
+                                    <input type="text" class="form-control bg-white" value="{{ '%.2f'|format(ideal_time_mins) }}" readonly>
+                                    <div class="form-text small text-muted">Actual qty x ideal cycle / 60</div>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small text-muted fw-bold">Planned Downtime (Mins)</label>
+                                    <input type="text" class="form-control bg-white" value="{{ downtime_mins }}" readonly>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small text-muted fw-bold">Total Available Time (Hrs)</label>
+                                    <input type="text" class="form-control bg-white" value="{{ '%.2f'|format(available_mins / 60) }}" readonly>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small text-muted fw-bold">Ideal Time It Should Take (Hrs)</label>
+                                    <input type="text" class="form-control bg-white" value="{{ '%.2f'|format(ideal_time_mins / 60) }}" readonly>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small text-muted fw-bold">Unaccounted (Mins)</label>
+                                    <input type="text" class="form-control bg-white" value="{{ '%.2f'|format(unaccounted_mins) }}" readonly>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label small text-muted fw-bold">Operators</label>
+                                    <textarea class="form-control bg-white" rows="2" readonly>{% for op in production_entry.operators %}{{ op.operator_info.emp_name if op.operator_info else '' }} ({{ op.operator_info.emp_code if op.operator_info else '' }}){% if not loop.last %}; {% endif %}{% endfor %}</textarea>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small text-muted fw-bold">Shift Supervisors</label>
+                                    <textarea class="form-control bg-white" rows="2" readonly>{% for sup in production_entry.supervisors %}{{ sup.supervisor_info.emp_name if sup.supervisor_info else '' }} ({{ sup.supervisor_info.emp_code if sup.supervisor_info else '' }}){% if not loop.last %}; {% endif %}{% endfor %}</textarea>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small text-muted fw-bold">Planned Downtime Breakdown</label>
+                                    <textarea class="form-control bg-white" rows="2" readonly>{% for pd in production_entry.planned_downtime %}{{ pd.reason.reason_name if pd.reason else 'N/A' }}: {{ pd.duration_minutes or 0 }} min{% if not loop.last %}; {% endif %}{% endfor %}</textarea>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small text-muted fw-bold">Production Issues</label>
+                                    <textarea class="form-control bg-white" rows="2" readonly>{% for issue in production_entry.issues %}{{ issue.issue_type.issue_name if issue.issue_type else 'Issue' }} ({{ issue.impact_minutes or 0 }}m){% if issue.custom_remark %}: {{ issue.custom_remark }}{% endif %}{% if not loop.last %}; {% endif %}{% endfor %}</textarea>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small text-muted fw-bold">Production Self Rejection Breakdown</label>
+                                    <textarea class="form-control bg-white" rows="2" readonly>{% for sr in production_entry.self_rejection_defects %}{{ sr.defect_type.defect_name if sr.defect_type else 'Defect' }}: {{ sr.reject_qty or 0 }} pcs{% if not loop.last %}; {% endif %}{% endfor %}</textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="rounded-3 p-4 mb-4 border border-secondary border-opacity-10 bg-light">
+                        <h6 class="text-uppercase text-muted small fw-bold mb-3">
+                            <i class="fas fa-industry me-2"></i>Select Production Context
+                        </h6>
+                        <div class="row g-4">
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold small text-muted">Shift</label>
+                                <select name="shift" class="form-select" required>
+                                    <option value="">Select Shift...</option>
+                                    <option value="A">A</option>
+                                    <option value="B">B</option>
+                                    <option value="C">C</option>
+                                </select>
+                            </div>
+                            <div class="col-md-5">
+                                <label class="form-label fw-bold small text-muted">Customer</label>
+                                <select name="customer_id" class="form-select" id="customerSelect" required>
+                                    <option value="">Select Customer...</option>
+                                    {% for customer in customers %}
+                                    <option value="{{ customer.id }}">{{ customer.customer_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold small text-muted">Section Number</label>
+                                <select name="section_id" class="form-select" id="sectionSelect" required>
+                                    <option value="">Select Section...</option>
+                                </select>
+                                <input type="hidden" name="section_number" id="sectionNumberHidden">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold small text-muted">Cut Length (mm)</label>
+                                <select name="cl_id" class="form-select" id="clSelect" required>
+                                    <option value="">Select Length...</option>
+                                </select>
+                                <input type="hidden" name="length" id="lengthHidden">
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Section 2: Rejection Inputs -->
+                    <div class="rounded-3 p-3 p-md-4 mb-4 border border-warning border-opacity-25 bg-warning bg-opacity-10 mobile-tight-pad">
+                        <h6 class="text-uppercase text-warning-emphasis small fw-bold mb-3">
+                            <i class="fas fa-clipboard-check me-2"></i>Rejection Entry Inputs
+                        </h6>
+                        <div class="row g-4">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small text-muted">Rejection Date & Time <span class="text-danger">*</span></label>
+                                <input type="datetime-local" name="rejection_datetime" class="form-control"
+                                    value="{{ now.strftime('%Y-%m-%dT%H:%M') }}" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Total Parts Inspected Qty <span
+                                        class="text-danger">*</span></label>
+                                <input type="number" name="total_parts_inspected_qty" id="totalInspected"
+                                    class="form-control fw-bold" value="0" min="0" required>
+                                <small class="text-muted">Must be greater than total defect qty and within produced OK qty.</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 3: Rejection Summary -->
+                    <div class="card border border-danger border-opacity-10 mb-4 shadow-sm">
+                        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <h6 class="mb-0 text-danger fw-bold"><i class="fas fa-exclamation-triangle me-2"></i>Rejection Summary</h6>
+                            <button type="button" class="btn btn-sm btn-outline-danger" id="addDefectRow">
+                                <i class="fas fa-plus me-1"></i>Add Defect Rank
+                            </button>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0" id="defectTable">
+                                    <thead class="bg-light">
+                                        <tr>
+                                            <th style="width: 55%">Defect Type</th>
+                                            <th style="width: 25%">Defect PCS Qty</th>
+                                            <th style="width: 20%" class="text-center">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="defectContainer">
+                                        <tr class="defect-row">
+                                            <td>
+                                                <select name="defect_type_id[]" class="form-select select2-defect">
+                                                    <option value="">Select Defect...</option>
+                                                    {% for defect in defect_types %}
+                                                    <option value="{{ defect.id }}">{{ defect.defect_name }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </td>
+                                            <td>
+                                                <div class="input-group">
+                                                    <input type="number" name="defect_count[]" class="form-control defect-count-input" value="0" min="0">
+                                                    <span class="input-group-text">PCS</span>
+                                                </div>
+                                            </td>
+                                            <td class="text-center">
+                                                <button type="button" class="btn btn-sm btn-link text-danger remove-defect-row" style="display:none;">
+                                                    <i class="fas fa-trash-alt"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="p-3 border-top bg-light-subtle">
+                                <div class="row g-3 align-items-end">
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-bold small">Total Defect PCS Qty</label>
+                                        <input type="number" name="rj_pcs_total" id="rjPcsTotal" class="form-control form-control-lg border-danger text-danger fw-bold bg-light" value="0" readonly>
+                                    </div>
+                                    <div class="col-md-4">
+                                        {% if production_entry %}
+                                        <input type="hidden" name="weight_per_pcs" id="weightPerPcs" value="{{ '%.3f'|format(production_entry.self_rejection_weight_per_pcs or 0) }}">
+                                        <label class="form-label fw-bold small">Weight/PCS (kg)</label>
+                                        <input type="text" class="form-control form-control-lg fw-bold bg-light" value="{{ '%.3f'|format(production_entry.self_rejection_weight_per_pcs or 0) }}" readonly>
+                                        {% else %}
+                                        <label class="form-label fw-bold small">Weight/PCS (kg)</label>
+                                        <input type="number" step="0.001" name="weight_per_pcs" id="weightPerPcs" class="form-control form-control-lg fw-bold" value="0.000" required>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-bold small">Total R/J Wt (kg)</label>
+                                        <input type="text" id="rjWeightTotal" class="form-control form-control-lg bg-light fw-bold" value="0.000" readonly>
+                                    </div>
+                                    <div class="col-md-8">
+                                        <label class="form-label fw-bold small">Remarks</label>
+                                        <input type="text" name="rejection_reason" class="form-control" placeholder="Optional rejection remarks...">
+                                    </div>
+                                    <div class="col-md-4 text-center">
+                                        <div class="quality-gauge-container mb-1">
+                                            <svg viewBox="0 0 100 50" class="w-100">
+                                                <path class="gauge-bg" d="M 10 45 A 35 35 0 0 1 90 45" />
+                                                <path id="qualityGaugePath" class="gauge-fill status-green" d="M 10 45 A 35 35 0 0 1 90 45" stroke-dasharray="126, 126" />
+                                            </svg>
+                                            <div id="qualityGaugeText" class="position-absolute top-50 start-50 translate-middle mt-2 fw-bold small">100%</div>
+                                        </div>
+                                        <small class="text-muted fw-bold" style="font-size: 0.65rem;">QUALITY SCORE</small>
+                                        <div id="qualityScoreBadge" class="badge bg-success mt-1">Excellent</div>
+                                        <div id="qualityScoreHint" class="small text-muted mt-1">Great quality trend based on current entries.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 4: Rework Summary -->
+                    <div class="card border border-success border-opacity-10 mb-4">
+                        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <h6 class="mb-0 text-success fw-bold"><i class="fas fa-recycle me-2"></i>Rework Summary</h6>
+                            <button type="button" class="btn btn-sm btn-outline-success" id="addReworkRow">
+                                <i class="fas fa-plus me-1"></i>Add Defect Rank
+                            </button>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0" id="reworkTable">
+                                    <thead class="bg-light">
+                                        <tr>
+                                            <th style="width: 55%">Defect Type</th>
+                                            <th style="width: 25%">Rework PCS Qty</th>
+                                            <th style="width: 20%" class="text-center">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="reworkContainer">
+                                        <tr class="rework-row">
+                                            <td>
+                                                <select name="rework_defect_type_id[]" class="form-select rework-defect-select">
+                                                    <option value="">Select Defect...</option>
+                                                    {% for defect in defect_types %}
+                                                    <option value="{{ defect.id }}">{{ defect.defect_name }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </td>
+                                            <td>
+                                                <div class="input-group">
+                                                    <input type="number" name="rework_qty[]" class="form-control rework-qty-input" value="0" min="0">
+                                                    <span class="input-group-text">PCS</span>
+                                                </div>
+                                            </td>
+                                            <td class="text-center">
+                                                <button type="button" class="btn btn-sm btn-link text-danger remove-rework-row" style="display:none;">
+                                                    <i class="fas fa-trash-alt"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="p-3 border-top bg-light-subtle">
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-semibold">Total Rework PCS Qty</label>
+                                        <input type="number" id="reworkTotalQty" class="form-control bg-light" value="0" readonly>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-semibold">Total Rework Wt (kg)</label>
+                                        <input type="text" id="reworkWeightTotal" class="form-control bg-light" value="0.000" readonly>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label fw-semibold">Remarks</label>
+                                        <input type="text" name="rework_remarks" class="form-control" placeholder="Optional rework remarks...">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 5: Quality Supervision -->
+                    <div class="card border border-primary border-opacity-10 mb-5">
+                        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <h6 class="mb-0 text-primary fw-bold"><i class="fas fa-users-cog me-2"></i>Quality
+                                Supervisor & Inspection Time</h6>
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="addSupervisorRow">
+                                <i class="fas fa-user-plus me-1"></i>Add Alternate
+                            </button>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0" id="supervisorTable">
+                                    <thead class="bg-light">
+                                        <tr>
+                                            <th style="width: 40%">Supervisor Code / Name <span
+                                                    class="text-danger">*</span></th>
+                                            <th style="width: 25%">Start Datetime <span class="text-danger">*</span>
+                                            </th>
+                                            <th style="width: 25%">End Datetime <span class="text-danger">*</span></th>
+                                            <th style="width: 10%" class="text-center">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="supervisorContainer">
+                                        <tr class="supervisor-row">
+                                            <td>
+                                                <div class="row g-2">
+                                                    <div class="col-12 col-sm-5">
+                                                        <input type="text" class="form-control supervisor-code"
+                                                            name="supervisor_code[]" placeholder="Code (e.g. 1515)"
+                                                            required>
+                                                    </div>
+                                                    <div class="col-12 col-sm-7">
+                                                        <input type="text"
+                                                            class="form-control bg-light supervisor-name-display"
+                                                            readonly placeholder="Lookup result...">
+                                                        <input type="hidden" name="supervisor_ids[]"
+                                                            class="supervisor-id-hidden">
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <input type="datetime-local" name="sup_start_time[]"
+                                                    class="form-control form-control-sm" required>
+                                            </td>
+                                            <td>
+                                                <input type="datetime-local" name="sup_end_time[]"
+                                                    class="form-control form-control-sm" required>
+                                            </td>
+                                            <td class="text-center">
+                                                <button type="button"
+                                                    class="btn btn-sm btn-link text-danger remove-supervisor-row"
+                                                    style="display:none;">
+                                                    <i class="fas fa-trash-alt"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Submit Actions -->
+                    <div id="mobileSubmitBar" class="d-flex flex-column flex-sm-row justify-content-end align-items-stretch align-items-sm-center gap-2 gap-sm-3 mt-4 pt-3 border-top">
+                        <a href="{{ url_for('rejection.rejection_records') }}"
+                            class="btn btn-light px-4 border">Cancel</a>
+                        <button type="submit" class="btn btn-primary btn-lg px-5 shadow-sm" id="submitBtn">
+                            <i class="fas fa-check-circle me-2"></i>Finalize Rejection Entry
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- SweetAlert2 (used for validations) -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<!-- Select2 -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+    // Constants
+    const nowISO = "{{ now.strftime('%Y-%m-%dT%H:%M') }}";
+
+    // Dynamic Lookups for context (only if not linked to production)
+    const customerSelect = document.getElementById('customerSelect');
+    const sectionSelect = document.getElementById('sectionSelect');
+    const clSelect = document.getElementById('clSelect');
+
+    if (customerSelect && !customerSelect.disabled && window.jQuery && jQuery.fn && jQuery.fn.select2) {
+        $(customerSelect).select2({ theme: 'bootstrap-5', placeholder: 'Select Customer...' });
+
+        $(customerSelect).on('change', async function () {
+            const custId = this.value;
+            sectionSelect.innerHTML = '<option value="">Select Section...</option>';
+            clSelect.innerHTML = '<option value="">Select Length...</option>';
+            if (!custId) return;
+            try {
+                const res = await fetch(`/master/api/sections/${custId}`);
+                const sections = await res.json();
+                sections.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s.id;
+                    opt.textContent = s.number;
+                    sectionSelect.appendChild(opt);
+                });
+            } catch (e) { console.error(e); }
+        });
+    }
+
+    if (sectionSelect && !sectionSelect.disabled) {
+        sectionSelect.addEventListener('change', async function () {
+            const sectId = this.value;
+            const hiddenNum = document.getElementById('sectionNumberHidden');
+            if (hiddenNum) hiddenNum.value = this.options[this.selectedIndex].text;
+            clSelect.innerHTML = '<option value="">Select Length...</option>';
+            if (!sectId) return;
+            try {
+                const res = await fetch(`/master/api/cut-lengths/${sectId}`);
+                const cls = await res.json();
+                cls.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.id;
+                    opt.textContent = `${c.length} mm`;
+                    clSelect.appendChild(opt);
+                });
+            } catch (e) { console.error(e); }
+        });
+    }
+
+    if (clSelect && !clSelect.disabled) {
+        clSelect.addEventListener('change', function () {
+            const text = this.options[this.selectedIndex].text;
+            const hiddenLen = document.getElementById('lengthHidden');
+            if (hiddenLen) hiddenLen.value = text.replace(' mm', '');
+        });
+    }
+
+    // Weight and Count calculation
+    function calculateTotals() {
+        let totalDefectPcs = 0;
+        document.querySelectorAll('.defect-count-input').forEach(input => {
+            totalDefectPcs += parseFloat(input.value) || 0;
+        });
+
+        let totalReworkQty = 0;
+        document.querySelectorAll('.rework-qty-input').forEach(input => {
+            totalReworkQty += parseFloat(input.value) || 0;
+        });
+
+        const rjPcsTotalEl = document.getElementById('rjPcsTotal');
+        const rjWeightTotalEl = document.getElementById('rjWeightTotal');
+        const reworkWeightTotalEl = document.getElementById('reworkWeightTotal');
+        const weightPerPcs = parseFloat(document.getElementById('weightPerPcs').value) || 0;
+        const reworkTotalQtyEl = document.getElementById('reworkTotalQty');
+
+        if (reworkTotalQtyEl) reworkTotalQtyEl.value = totalReworkQty;
+
+        // Rejection summary shows raw defect total; rework summary separately shows recovered qty.
+        rjPcsTotalEl.value = totalDefectPcs;
+        rjWeightTotalEl.value = (totalDefectPcs * weightPerPcs).toFixed(3);
+        if (reworkWeightTotalEl) reworkWeightTotalEl.value = (totalReworkQty * weightPerPcs).toFixed(3);
+
+        // Validation highlighting
+        const totalInspectedEl = document.getElementById('totalInspected');
+        const totalInspected = parseFloat(totalInspectedEl.value) || 0;
+        const producedOkLimit = parseFloat((document.getElementById('producedOkQtyLimit') || {}).value) || 0;
+        if (totalDefectPcs > totalInspected) {
+            document.getElementById('rjPcsTotal').classList.add('is-invalid');
+        } else {
+            document.getElementById('rjPcsTotal').classList.remove('is-invalid');
+        }
+
+        if (producedOkLimit > 0 && totalInspected > producedOkLimit) {
+            totalInspectedEl.classList.add('is-invalid');
+            totalInspectedEl.setAttribute('title', `Total inspected cannot exceed produced total OK qty (${producedOkLimit}).`);
+        } else {
+            totalInspectedEl.classList.remove('is-invalid');
+            totalInspectedEl.removeAttribute('title');
+        }
+
+        // Quality score is based on gross rejection captured in rejection summary.
+        updateQualityGauge(totalDefectPcs, totalInspected);
+    }
+
+    function validateReworkSummary() {
+        const reworkRows = Array.from(document.querySelectorAll('#reworkContainer .rework-row'));
+        for (let i = 0; i < reworkRows.length; i++) {
+            const row = reworkRows[i];
+            const defectTypeId = (row.querySelector('select[name="rework_defect_type_id[]"]') || {}).value || '';
+            const qty = parseInt((row.querySelector('.rework-qty-input') || {}).value || '0', 10) || 0;
+
+            if (!defectTypeId && qty === 0) {
+                continue;
+            }
+            if (!defectTypeId && qty > 0) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Missing Rework Defect',
+                    text: `Rework row #${i + 1}: select a defect type when rework quantity is entered.`
+                });
+                return false;
+            }
+            if (qty < 0) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Invalid Rework Qty',
+                    text: `Rework row #${i + 1}: quantity cannot be negative.`
+                });
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    function validateDefectSummary() {
+        const defectRows = Array.from(document.querySelectorAll('#defectContainer .defect-row'));
+        for (let i = 0; i < defectRows.length; i++) {
+            const row = defectRows[i];
+            const defectTypeId = (row.querySelector('select[name="defect_type_id[]"]') || {}).value || '';
+            const qty = parseInt((row.querySelector('.defect-count-input') || {}).value || '0', 10) || 0;
+
+            if (!defectTypeId && qty === 0) {
+                continue;
+            }
+            if (!defectTypeId && qty > 0) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Missing Defect Type',
+                    text: `Rejection row #${i + 1}: select a defect type when defect quantity is entered.`
+                });
+                return false;
+            }
+            if (defectTypeId && qty <= 0) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Invalid Defect Qty',
+                    text: `Rejection row #${i + 1}: defect quantity must be greater than 0 when a defect type is selected.`
+                });
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    function updateQualityGauge(rejected, inspected) {
+        let quality = 100;
+        if (inspected > 0) {
+            quality = ((inspected - rejected) / inspected) * 100;
+        }
+        if (quality < 0) quality = 0;
+
+        const dashArray = (quality / 100) * 126;
+        const path = document.getElementById('qualityGaugePath');
+        const text = document.getElementById('qualityGaugeText');
+        const badge = document.getElementById('qualityScoreBadge');
+        const hint = document.getElementById('qualityScoreHint');
+
+        if (path && text) {
+            path.setAttribute('stroke-dasharray', dashArray + ', 126');
+            text.textContent = Math.round(quality) + '%';
+
+            // Color logic
+            path.classList.remove('status-green', 'status-yellow', 'status-red');
+            if (quality >= 95) {
+                path.classList.add('status-green');
+                if (badge) { badge.className = 'badge bg-success mt-1'; badge.textContent = 'Excellent'; }
+                if (hint) hint.textContent = 'Very low rejection impact. Maintain current process stability.';
+            } else if (quality >= 85) {
+                path.classList.add('status-green');
+                if (badge) { badge.className = 'badge bg-success-subtle text-success border border-success-subtle mt-1'; badge.textContent = 'Good'; }
+                if (hint) hint.textContent = 'Quality is under control. Monitor defect trend closely.';
+            } else if (quality >= 70) {
+                path.classList.add('status-yellow');
+                if (badge) { badge.className = 'badge bg-warning text-dark mt-1'; badge.textContent = 'Watch'; }
+                if (hint) hint.textContent = 'Rejection is rising. Review top defects and immediate countermeasures.';
+            } else {
+                path.classList.add('status-red');
+                if (badge) { badge.className = 'badge bg-danger mt-1'; badge.textContent = 'Critical'; }
+                if (hint) hint.textContent = 'High rejection impact. Immediate corrective action is recommended.';
+            }
+        }
+    }
+
+    document.getElementById('weightPerPcs').addEventListener('input', calculateTotals);
+    document.getElementById('totalInspected').addEventListener('input', calculateTotals);
+    document.getElementById('rjPcsTotal').addEventListener('input', calculateTotals);
+    document.getElementById('rjWeightTotal').addEventListener('input', calculateTotals);
+    document.getElementById('defectContainer').addEventListener('input', function (e) {
+        if (e.target.classList.contains('defect-count-input')) {
+            calculateTotals();
+        }
+    });
+    document.getElementById('defectContainer').addEventListener('change', function (e) {
+        if (e.target.matches('select[name="defect_type_id[]"]')) {
+            calculateTotals();
+        }
+    });
+    document.addEventListener('input', function (e) {
+        if (e.target.classList.contains('rework-qty-input')) {
+            calculateTotals();
+        }
+    });
+    document.getElementById('reworkContainer').addEventListener('change', function (e) {
+        if (e.target.matches('select[name="rework_defect_type_id[]"]')) {
+            calculateTotals();
+        }
+    });
+    // Dynamic Defect Rows
+    document.getElementById('addDefectRow').addEventListener('click', function () {
+        const container = document.getElementById('defectContainer');
+        const firstRow = container.querySelector('.defect-row');
+        const newRow = firstRow.cloneNode(true);
+
+        // Reset row
+        newRow.querySelector('.defect-count-input').value = 0;
+        const select = newRow.querySelector('select');
+        select.value = "";
+
+        // Handle select2 if re-initializing is needed
+        container.appendChild(newRow);
+        updateActionButtons('.defect-row', '.remove-defect-row');
+        calculateTotals();
+    });
+
+    // Dynamic Rework Rows
+    document.getElementById('addReworkRow').addEventListener('click', function () {
+        const container = document.getElementById('reworkContainer');
+        const firstRow = container.querySelector('.rework-row');
+        const newRow = firstRow.cloneNode(true);
+
+        newRow.querySelector('.rework-qty-input').value = 0;
+        const select = newRow.querySelector('select[name="rework_defect_type_id[]"]');
+        select.value = "";
+
+        container.appendChild(newRow);
+        updateActionButtons('.rework-row', '.remove-rework-row');
+        calculateTotals();
+    });
+
+    // Dynamic Supervisor Rows
+    document.getElementById('addSupervisorRow').addEventListener('click', function () {
+        const container = document.getElementById('supervisorContainer');
+        const firstRow = container.querySelector('.supervisor-row');
+        const newRow = firstRow.cloneNode(true);
+
+        newRow.querySelectorAll('input').forEach(input => {
+            if (input.type === 'datetime-local') input.value = nowISO;
+            else input.value = "";
+        });
+        newRow.querySelector('.supervisor-name-display').value = "";
+
+        container.appendChild(newRow);
+        updateActionButtons('.supervisor-row', '.remove-supervisor-row');
+    });
+
+    function updateActionButtons(rowClass, btnClass) {
+        const rows = document.querySelectorAll(rowClass);
+        rows.forEach(row => {
+            row.querySelector(btnClass).style.display = rows.length > 1 ? 'inline-block' : 'none';
+        });
+    }
+
+    // Delegation for removal
+    document.addEventListener('click', function (e) {
+        if (e.target.closest('.remove-defect-row')) {
+            e.target.closest('.defect-row').remove();
+            calculateTotals();
+            updateActionButtons('.defect-row', '.remove-defect-row');
+        }
+        if (e.target.closest('.remove-supervisor-row')) {
+            e.target.closest('.supervisor-row').remove();
+            updateActionButtons('.supervisor-row', '.remove-supervisor-row');
+        }
+        if (e.target.closest('.remove-rework-row')) {
+            e.target.closest('.rework-row').remove();
+            updateActionButtons('.rework-row', '.remove-rework-row');
+            calculateTotals();
+        }
+    });
+
+    // Supervisor Lookup
+    async function lookupSupervisor(input) {
+        const row = input.closest('.supervisor-row');
+        const nameDisplay = row.querySelector('.supervisor-name-display');
+        const idHidden = row.querySelector('.supervisor-id-hidden');
+        const code = input.value.trim();
+        if (!code) return;
+        try {
+            const res = await fetch(`/rejection/api/employee/${code}`);
+            const data = await res.json();
+            if (data.success) {
+                nameDisplay.value = data.emp_name;
+                idHidden.value = data.emp_id;
+            } else {
+                nameDisplay.value = 'NOT FOUND';
+                idHidden.value = '';
+            }
+        } catch (e) { nameDisplay.value = 'ERROR'; }
+    }
+
+    document.getElementById('supervisorContainer').addEventListener('change', function (e) {
+        if (e.target.classList.contains('supervisor-code')) {
+            lookupSupervisor(e.target);
+        }
+    });
+
+    // Show more/less for linked production read-only details
+    (function () {
+        const btn = document.getElementById('toggleProdMoreBtn');
+        const panel = document.getElementById('prodMoreDetails');
+        if (!btn || !panel) return;
+
+        btn.addEventListener('click', function () {
+            const expanded = !panel.classList.contains('d-none');
+            if (expanded) {
+                panel.classList.add('d-none');
+                btn.innerHTML = '<i class="fas fa-chevron-down me-1"></i>Show More';
+            } else {
+                panel.classList.remove('d-none');
+                btn.innerHTML = '<i class="fas fa-chevron-up me-1"></i>Show Less';
+            }
+        });
+    })();
+
+    // Validation before submit
+    document.getElementById('rejectionForm').addEventListener('submit', function (e) {
+        if (this.dataset.allowZeroSubmit === 'true') {
+            delete this.dataset.allowZeroSubmit;
+            return;
+        }
+
+        const totalInspected = parseInt(document.getElementById('totalInspected').value) || 0;
+        const totalRejected = parseInt(document.getElementById('rjPcsTotal').value) || 0;
+        const totalRework = parseInt(document.getElementById('reworkTotalQty').value) || 0;
+        const producedOkLimit = parseInt((document.getElementById('producedOkQtyLimit') || {}).value) || 0;
+
+        if (!validateDefectSummary()) {
+            e.preventDefault();
+            return;
+        }
+
+        if (!validateReworkSummary()) {
+            e.preventDefault();
+            return;
+        }
+
+        if (totalInspected <= 0) {
+            e.preventDefault();
+            Swal.fire({
+                icon: 'warning',
+                title: 'Edit Inspected Qty',
+                text: 'Total Parts Inspected Qty must be greater than 0.'
+            });
+            return;
+        }
+
+        if (totalRejected > totalInspected) {
+            e.preventDefault();
+            Swal.fire({
+                icon: 'error',
+                title: 'Data Discrepancy',
+                text: `Total rejected qty (${totalRejected}) cannot be more than Total Parts Inspected Qty (${totalInspected}).`
+            });
+            return;
+        }
+
+        if ((totalRejected + totalRework) > totalInspected) {
+            e.preventDefault();
+            Swal.fire({
+                icon: 'error',
+                title: 'Data Discrepancy',
+                text: `Total rejected qty + total rework qty (${totalRejected + totalRework}) cannot be more than Total Parts Inspected Qty (${totalInspected}).`
+            });
+            return;
+        }
+
+        if (producedOkLimit > 0 && totalInspected > producedOkLimit) {
+            e.preventDefault();
+            Swal.fire({
+                icon: 'error',
+                title: 'Inspected Qty Exceeded',
+                text: `Total Parts Inspected Qty (${totalInspected}) cannot be more than produced total OK quantity (${producedOkLimit}).`
+            });
+            return;
+        }
+
+        // Supervisor validation
+        const supIds = Array.from(document.getElementsByName('supervisor_ids[]')).filter(i => i.value);
+        if (supIds.length === 0) {
+            e.preventDefault();
+            Swal.fire({ icon: 'warning', title: 'Missing Personnel', text: 'Please add at least one valid Quality Supervisor.' });
+            return;
+        }
+
+        // Validate quality supervisor time ranges: Start < End for each row.
+        const supStarts = Array.from(document.getElementsByName('sup_start_time[]'));
+        const supEnds = Array.from(document.getElementsByName('sup_end_time[]'));
+        for (let i = 0; i < Math.max(supStarts.length, supEnds.length); i++) {
+            const sEl = supStarts[i];
+            const eEl = supEnds[i];
+            if (!sEl || !eEl) continue;
+            if (!sEl.value || !eEl.value) continue;
+            const s = new Date(sEl.value);
+            const en = new Date(eEl.value);
+            if (s.getTime() >= en.getTime()) {
+                e.preventDefault();
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Invalid Supervisor Time',
+                    text: `Quality Supervisor row #${i + 1}: Start Datetime must be earlier than End Datetime.`
+                });
+                eEl.focus();
+                return;
+            }
+        }
+
+        if (totalRejected === 0 && totalRework === 0) {
+            e.preventDefault();
+            Swal.fire({
+                icon: 'info',
+                title: 'No rejection and no rework added. Both counted as 0.',
+                confirmButtonText: 'Submit'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    this.dataset.allowZeroSubmit = 'true';
+                    this.submit();
+                }
+            });
+        }
+    });
+
+    // Shared Styles
+    const select2StyleHeader = document.createElement('style');
+    select2StyleHeader.innerHTML = `
+        .bg-soft-primary { background-color: rgba(13, 110, 253, 0.05); }
+        .bg-soft-danger { background-color: rgba(220, 53, 69, 0.05); }
+        .select2-container .select2-selection--single { height: 38px !important; border-radius: 0.375rem !important; border: 1px solid #dee2e6 !important; }
+        .select2-container--default .select2-selection--single .select2-selection__rendered { line-height: 38px !important; }
+    `;
+    document.head.appendChild(select2StyleHeader);
+    updateActionButtons('.defect-row', '.remove-defect-row');
+    updateActionButtons('.rework-row', '.remove-rework-row');
+    updateActionButtons('.supervisor-row', '.remove-supervisor-row');
+    calculateTotals();
+</script>
+{% endblock %}

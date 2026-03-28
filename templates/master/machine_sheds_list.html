@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block page_title %}Machine Sheds{% endblock %}
+{% block page_subtitle %}Manage Shed-Wise Machine Groups{% endblock %}
+{% block title %}Machine Sheds - Machine Shop{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 text-gray-800">Machine Sheds</h1>
+    <a href="{{ url_for('master_data.add_machine_shed') }}" class="btn btn-primary">
+        <i class="fas fa-plus me-2"></i>Add Shed
+    </a>
+</div>
+
+<div class="card shadow mb-4">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered align-middle">
+                <thead>
+                    <tr>
+                        <th style="width:70px;">Sr. No</th>
+                        <th>Shed Name</th>
+                        <th>Machines</th>
+                        <th>Description</th>
+                        <th>Status</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for shed in pagination.items %}
+                    <tr>
+                        <td class="text-muted text-end">
+                            {{ (pagination.page - 1) * pagination.per_page + loop.index }}
+                        </td>
+                        <td class="fw-bold">{{ shed.shed_name }}</td>
+                        <td>
+                            <span class="badge bg-primary-subtle text-primary">{{ shed.machines|length }}</span>
+                        </td>
+                        <td>{{ shed.description or '-' }}</td>
+                        <td>{{ shed.status or 'Active' }}</td>
+                        <td class="text-end">
+                            <a href="{{ url_for('master_data.view_machine_shed', shed_id=shed.id) }}" class="btn btn-sm btn-outline-secondary">View</a>
+                            <a href="{{ url_for('master_data.edit_machine_shed', shed_id=shed.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+                            <form action="{{ url_for('master_data.delete_machine_shed', shed_id=shed.id) }}" method="POST" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this shed?');">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">No machine sheds found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% from "_pagination.html" import render_pagination %}
+        {{ render_pagination(pagination, 'master_data.list_machine_sheds') }}
+    </div>
+</div>
+{% endblock %}

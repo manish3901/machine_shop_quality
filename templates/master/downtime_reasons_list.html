@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block page_title %}Downtime Reasons{% endblock %}
+{% block page_subtitle %}Master Data Management{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="page-title mb-0"><i class="fas fa-clock"></i> Downtime Reasons</h1>
+    <a href="{{ url_for('master_data.add_downtime_reason') }}" class="btn btn-primary">
+        <i class="fas fa-plus"></i> Add New Reason
+    </a>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="bg-light">
+                    <tr>
+                        <th style="width:70px;">Sr. No</th>
+                        <th class="ps-4">Reason Name</th>
+                        <th>Description</th>
+                        <th class="text-center">Type</th>
+                        <th class="text-center">Status</th>
+                        <th class="text-end pe-4">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for reason in reasons %}
+                    <tr>
+                        <td class="text-muted text-end">
+                            {{ loop.index }}
+                        </td>
+                        <td class="ps-4 fw-bold">{{ reason.reason_name }}</td>
+                        <td>{{ reason.description or '-' }}</td>
+                        <td class="text-center">
+                            {% if reason.is_fixed %}
+                            <span class="badge bg-primary">Fixed ({{ reason.default_minutes }}m)</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Unfixed</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <span
+                                class="badge {% if reason.status == 'Active' %}bg-success{% else %}bg-secondary{% endif %}">
+                                {{ reason.status }}
+                            </span>
+                        </td>
+                        <td class="text-end pe-4">
+                            <a href="{{ url_for('master_data.edit_downtime_reason', reason_id=reason.id) }}"
+                                class="btn btn-sm btn-outline-warning me-2">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <form action="{{ url_for('master_data.delete_downtime_reason', reason_id=reason.id) }}"
+                                method="POST" class="d-inline"
+                                onsubmit="return confirm('Are you sure you want to delete this reason?');">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center py-5 text-muted">
+                            <i class="fas fa-info-circle fa-2x mb-3 d-block"></i>
+                            No downtime reasons found.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

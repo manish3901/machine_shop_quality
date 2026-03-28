@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block page_title %}Error{% endblock %}
+{% block page_subtitle %}Something went wrong{% endblock %}
+
+{% block title %}Error - Machine Shop{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-8">
+        <div class="card border-danger shadow">
+            <div class="card-header bg-danger text-white">
+                <h4 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i> Application Error</h4>
+            </div>
+            <div class="card-body py-5 text-center">
+                <div class="mb-4">
+                    <i class="fas fa-bug text-danger fa-4x"></i>
+                </div>
+                <h2 class="text-dark mb-3">Something went wrong</h2>
+                <p class="lead text-muted mb-4">
+                    The application encountered an unexpected error while processing your request.
+                </p>
+
+                {% if error %}
+                <div class="alert alert-light border text-start mb-4">
+                    <h6 class="fw-bold text-danger mb-2">Error Details:</h6>
+                    <code class="text-break">{{ error }}</code>
+                </div>
+                {% endif %}
+
+                <div class="d-grid gap-2 d-sm-flex justify-content-sm-center mt-4">
+                    <a href="{{ url_for('web.index') }}" class="btn btn-primary px-4">
+                        <i class="fas fa-home me-2"></i> Return to Dashboard
+                    </a>
+                    <button onclick="window.history.back()" class="btn btn-outline-secondary px-4">
+                        <i class="fas fa-arrow-left me-2"></i> Go Back
+                    </button>
+                </div>
+            </div>
+            <div class="card-footer bg-light small text-muted">
+                Reference ID: {{ now.strftime('%Y%m%d%H%M%S') if now else 'N/A' }}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

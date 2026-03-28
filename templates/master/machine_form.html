@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block page_title %}{{ 'Edit' if machine else 'New' }} Machine{% endblock %}
+{% block page_subtitle %}Manage Machine Details{% endblock %}
+{% block title %}Add/Edit Machine - Machine Shop{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-xl-6 col-lg-8 col-md-10">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">{{ 'Edit' if machine else 'Add' }} Machine</h6>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Machine Name</label>
+                        <input type="text" class="form-control" name="machine_name"
+                            value="{{ machine.machine_name if machine }}" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Type</label>
+                        <select class="form-select" name="machine_type" required>
+                            <option value="">Select Machine Type</option>
+                            {% for machine_type in machine_types %}
+                            <option value="{{ machine_type }}" {% if machine and machine.machine_type == machine_type %}selected{% endif %}>
+                                {{ machine_type }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">
+                            Manage machine types from the Machine Types master page, then select them here.
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Machine Shed</label>
+                        <select class="form-select" name="shed_id" required>
+                            <option value="">Select Shed</option>
+                            {% for shed in sheds %}
+                            <option value="{{ shed.id }}" {% if machine and machine.shed_id == shed.id %}selected{% endif %}>
+                                {{ shed.shed_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Status</label>
+                        <select class="form-select" name="status">
+                            <option value="Active" {% if machine and machine.status=='Active' %}selected{% endif %}>
+                                Active</option>
+                            <option value="Inactive" {% if machine and machine.status=='Inactive' %}selected{% endif %}>
+                                Inactive</option>
+                            <option value="Maintenance" {% if machine and machine.status=='Maintenance' %}selected{%
+                                endif %}>Maintenance</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Monthly Capacity (Hrs/Qty)</label>
+                        <input type="number" class="form-control" name="monthly_capacity"
+                            value="{{ machine.monthly_capacity if machine else 0 }}">
+                        <div class="form-text">Baseline maximum output explicitly assigned to this machine each month.
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('master_data.list_machines') }}" class="btn btn-light me-md-2">Cancel</a>
+                        <button type="submit" class="btn btn-primary">Save Machine</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

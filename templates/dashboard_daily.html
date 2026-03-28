@@ -1,0 +1,780 @@
+{% extends "base.html" %}
+
+{% block page_title %}Daily Dashboard{% endblock %}
+{% block page_subtitle %}Production Overview{% endblock %}
+
+{% block title %}Daily Production Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    .chart-container {
+        position: relative;
+        height: 300px;
+        margin-bottom: 30px;
+        overflow: hidden;
+    }
+    .chart-container canvas {
+        width: 100% !important;
+        height: 100% !important;
+        display: block;
+    }
+    .chart-insight {
+        font-size: 0.9rem;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 10px 12px;
+        color: #334155;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+{% set shift_eff = [] %}
+{% for shift in ['A', 'B', 'C'] %}
+{% set s = by_shift.get(shift) %}
+{% set eff = (s.final_ok / s.planned * 100) | round(2) if s and s.planned > 0 else 0 %}
+{% if shift_eff.append(eff) %}{% endif %}
+{% endfor %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="page-title mb-0"><i class="fas fa-chart-bar"></i> Daily Production Dashboard</h1>
+</div>
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-2 align-items-end" id="dashFilterForm">
+            <div class="col-md-2">
+                <label class="form-label small mb-1">Start Date</label>
+                <input type="datetime-local" class="form-control" name="start_date" value="{{ start_datetime_value }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small mb-1">End Date</label>
+                <input type="datetime-local" class="form-control" name="end_date" value="{{ end_datetime_value }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small mb-1">Machine</label>
+                <select class="form-select" id="machine_id" name="machine_id">
+                    <option value="">All</option>
+                    {% for m in filter_machines %}<option value="{{ m.id }}" {% if request.args.get('machine_id')==m.id|string %}selected{% endif %}>{{ m.machine_name }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small mb-1">Customer</label>
+                <select class="form-select" id="customer_id" name="customer_id">
+                    <option value="">All</option>
+                    {% for c in filter_customers %}<option value="{{ c.id }}" {% if request.args.get('customer_id')==c.id|string %}selected{% endif %}>{{ c.customer_name }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small mb-1">Section</label>
+                <select class="form-select" id="section_number" name="section_number" data-selected="{{ request.args.get('section_number', request.args.get('section', '')) }}">
+                    <option value="">All</option>
+                    {% for s in filter_sections %}<option value="{{ s.section_number }}" {% if request.args.get('section_number', request.args.get('section', ''))==s.section_number %}selected{% endif %}>{{ s.section_number }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small mb-1">Cut Length</label>
+                <select class="form-select" id="cut_length" name="cut_length" data-selected="{{ request.args.get('cut_length', request.args.get('cutlength', '')) }}">
+                    <option value="">All</option>
+                    {% for cl in filter_cut_lengths %}<option value="{{ cl.cut_length }}" {% if request.args.get('cut_length', request.args.get('cutlength', ''))==cl.cut_length|string %}selected{% endif %}>{{ cl.cut_length }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small mb-1">Process</label>
+                <select class="form-select" id="operation_type_id" name="operation_type_id" data-selected="{{ request.args.get('operation_type_id', '') }}">
+                    <option value="">All</option>
+                    {% for op in filter_operations %}<option value="{{ op.id }}" {% if request.args.get('operation_type_id')==op.id|string %}selected{% endif %}>{{ op.operation_name }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small mb-1">Shift</label>
+                <select class="form-select" name="shift">
+                    <option value="">All</option>
+                    <option value="A" {% if request.args.get('shift')=='A' %}selected{% endif %}>A</option>
+                    <option value="B" {% if request.args.get('shift')=='B' %}selected{% endif %}>B</option>
+                    <option value="C" {% if request.args.get('shift')=='C' %}selected{% endif %}>C</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small mb-1">Entry No</label>
+                <input type="text" class="form-control" name="entry_no" value="{{ request.args.get('entry_no', '') }}" placeholder="MS-2026-0001">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small mb-1">Employee Code</label>
+                <input type="text" class="form-control" name="emp_code" value="{{ request.args.get('emp_code', '') }}" placeholder="E1234">
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-primary w-100" type="submit">Apply</button>
+            </div>
+            <div class="col-md-2">
+                <a class="btn btn-outline-secondary w-100" href="{{ url_for('dashboard.daily_dashboard') }}">Reset</a>
+            </div>
+            <div class="col-md-2">
+                <a class="btn btn-outline-success w-100" href="{{ url_for('dashboard.oee_report_download', **request.args) }}">Download OEE</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fas fa-gauge-high me-2 text-primary"></i>
+                    <h6 class="mb-0 fw-bold">OEE Components</h6>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-secondary chart-data-btn"
+                    data-chart-title="OEE breakdown"
+                    data-chart-columns='[{"key":"metric","label":"Metric"},{"key":"value_pct","label":"Value %"},{"key":"formula","label":"Formula"},{"key":"basis","label":"Basis"},{"key":"numerator","label":"Numerator"},{"key":"denominator","label":"Denominator"}]'
+                    data-chart-rows='{{ oee_table | tojson | safe }}'>
+                    View Data
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="chart-fixed chart-sm">
+                    <canvas id="oeeChart"></canvas>
+                </div>
+                <div class="alert alert-light border mt-3 mb-0 small">
+                    <div>1. Availability is <strong>{{ oee_metrics.availability }}%</strong> because downtime is <strong>{{ total_downtime }}</strong> mins out of <strong>{{ total_planned_minutes }}</strong> planned mins.</div>
+                    <div>2. Performance is <strong>{{ oee_metrics.performance }}%</strong>, comparing ideal run time (<strong>{{ total_ideal_minutes }}</strong> mins) vs actual operating time (<strong>{{ total_operating_minutes }}</strong> mins).</div>
+                    <div>3. Quality is <strong>{{ oee_metrics.quality }}%</strong> based on good output (<strong>{{ total_ok }}</strong>) against rejects (<strong>{{ total_rejected_pcs }}</strong>).</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card-header bg-white py-3 border-0">
+                <h6 class="mb-0 fw-bold"><i class="fas fa-users me-2 text-success"></i>Employee Performance Sidebar</h6>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead><tr><th class="ps-3">Employee</th><th>Role</th><th>Assignments</th><th>Actual Qty</th></tr></thead>
+                        <tbody>
+                            {% for emp in employee_performance %}
+                            <tr>
+                                <td class="ps-3">{{ emp.name }} <small class="text-muted">({{ emp.code }})</small></td>
+                                <td>{{ emp.role }}</td>
+                                <td>{{ emp.assignments }}</td>
+                                <td class="fw-bold">{{ emp.actual_qty }}</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="4" class="text-center text-muted py-3">No employee performance rows for selected filters.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Key Metrics Row (Professional Theme) -->
+<div class="row g-4 mb-4">
+    <!-- Overall Efficiency -->
+    <div class="col-md-3">
+        <div class="glass-card h-100 p-4 position-relative overflow-hidden border-0 shadow-sm"
+            style="background: linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.4) 100%);">
+            <div class="d-flex justify-content-between align-items-start z-1 position-relative">
+                <div>
+                    <h6 class="text-uppercase text-muted fw-bold small mb-2">Efficiency</h6>
+                    <h2 class="display-5 fw-bold mb-0 text-dark font-monospace">{{ efficiency }}%</h2>
+                </div>
+                <div
+                    class="p-3 rounded-circle {{ 'bg-success bg-opacity-10 text-success' if efficiency >= 85 else ('bg-warning bg-opacity-10 text-warning' if efficiency >= 70 else 'bg-danger bg-opacity-10 text-danger') }}">
+                    <i class="fas fa-percentage fa-lg"></i>
+                </div>
+            </div>
+            <!-- Progress Bar -->
+            <div class="progress mt-3" style="height: 6px;">
+                <div class="progress-bar {{ 'bg-success' if efficiency >= 85 else ('bg-warning' if efficiency >= 70 else 'bg-danger') }}"
+                    role="progressbar" style="width: {{ efficiency }}%"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Total Planned -->
+    <div class="col-md-3">
+        <div class="glass-card h-100 p-4 border-0 shadow-sm">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="text-uppercase text-muted fw-bold small mb-0">Total Planned</h6>
+                <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill"><i class="fas fa-cube me-1"></i>
+                    Units</span>
+            </div>
+            <h2 class="display-5 fw-bold mb-0 text-dark font-monospace">{{ total_planned }}</h2>
+        </div>
+    </div>
+
+    <!-- Total Actual -->
+    <div class="col-md-3">
+        <div class="glass-card h-100 p-4 border-0 shadow-sm">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="text-uppercase text-muted fw-bold small mb-0">Final OK Qty</h6>
+                <span class="badge bg-success bg-opacity-10 text-success rounded-pill"><i class="fas fa-check me-1"></i>
+                    FINAL</span>
+            </div>
+            <h2 class="display-5 fw-bold mb-0 text-dark font-monospace">{{ total_ok }}</h2>
+            <div class="small text-muted mt-2">Final OK = Produced OK - current remaining quality rejects.</div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="glass-card h-100 p-4 border-0 shadow-sm">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="text-uppercase text-muted fw-bold small mb-0">Machining Scrap</h6>
+                <span class="badge bg-danger bg-opacity-10 text-danger rounded-pill"><i class="fas fa-weight-hanging me-1"></i>
+                    Kg</span>
+            </div>
+            <h2 class="display-5 fw-bold mb-0 text-danger font-monospace">{{ "{:,.3f}".format(total_machining_scrap_kg or 0) }}</h2>
+            <div class="small text-muted mt-2">Production cutting and machining wastage logged in kilograms.</div>
+        </div>
+    </div>
+
+    <!-- Downtime -->
+    <div class="col-md-3">
+        <div class="glass-card h-100 p-4 border-0 shadow-sm">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="text-uppercase text-muted fw-bold small mb-0">Downtime</h6>
+                <span class="badge bg-danger bg-opacity-10 text-danger rounded-pill"><i class="fas fa-clock me-1"></i>
+                    Minutes</span>
+            </div>
+            <h2 class="display-5 fw-bold mb-0 text-danger font-monospace">{{ total_downtime }}</h2>
+        </div>
+    </div>
+<!-- OEE Summary Row -->
+<div class="row g-4 mb-4">
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm bg-primary bg-gradient text-white rounded-4 h-100">
+            <div class="card-body p-4 text-center">
+                <h6 class="text-uppercase opacity-75 small fw-bold mb-3">Overall OEE</h6>
+                <div class="display-5 fw-bold mb-1">{{ oee_metrics.oee }}%</div>
+                <div class="small opacity-75">World Class: 85%+</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm rounded-4 h-100 border-start border-info border-5">
+            <div class="card-body p-4 text-center">
+                <h6 class="text-uppercase text-muted small fw-bold mb-3">Availability</h6>
+                <div class="h2 fw-bold text-info mb-1">{{ oee_metrics.availability }}%</div>
+                <div class="progress mt-2" style="height: 5px;">
+                    <div class="progress-bar bg-info" style="width: {{ oee_metrics.availability }}%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm rounded-4 h-100 border-start border-warning border-5">
+            <div class="card-body p-4 text-center">
+                <h6 class="text-uppercase text-muted small fw-bold mb-3">Performance</h6>
+                <div class="h2 fw-bold text-warning mb-1">{{ oee_metrics.performance }}%</div>
+                <div class="progress mt-2" style="height: 5px;">
+                    <div class="progress-bar bg-warning" style="width: {{ oee_metrics.performance }}%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm rounded-4 h-100 border-start border-success border-5">
+            <div class="card-body p-4 text-center">
+                <h6 class="text-uppercase text-muted small fw-bold mb-3">Quality</h6>
+                <div class="h2 fw-bold text-success mb-1">{{ oee_metrics.quality }}%</div>
+                <div class="progress mt-2" style="height: 5px;">
+                    <div class="progress-bar bg-success" style="width: {{ oee_metrics.quality }}%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- OEE Time Basis -->
+<div class="row g-4 mb-4">
+    <div class="col-md-12">
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-header bg-white py-3 border-0">
+                <h6 class="mb-0 fw-bold">
+                    <i class="fas fa-stopwatch me-2 text-primary"></i>OEE Time Basis (International Standard)
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row text-center g-3">
+                    <div class="col-md-2">
+                        <div class="small text-muted">Planned Time (min)</div>
+                        <div class="h5 fw-bold mb-0">{{ total_planned_minutes }}</div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="small text-muted">Operating Time (min)</div>
+                        <div class="h5 fw-bold mb-0 text-primary">{{ total_operating_minutes }}</div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="small text-muted">Downtime (min)</div>
+                        <div class="h5 fw-bold mb-0 text-danger">{{ total_downtime }}</div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="small text-muted">Ideal Time (min)</div>
+                        <div class="h5 fw-bold mb-0 text-info">{{ total_ideal_minutes }}</div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="small text-muted">Ideal vs Available Gap</div>
+                        <div class="h5 fw-bold mb-0 {{ 'text-success' if ideal_vs_available_gap >= 0 else 'text-danger' }}">{{ ideal_vs_available_gap }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card-body">
+                <div class="small text-muted text-uppercase fw-bold">Produced OK (Actual)</div>
+                <div class="h3 fw-bold text-primary mb-1">{{ total_actual }}</div>
+                <div class="small text-muted text-uppercase fw-bold mt-3">Rework Details</div>
+                <div class="small text-muted">{{ total_rework }} pcs reworked</div>
+                <ul class="list-unstyled mt-2 mb-0">
+                    {% if rework_breakdown %}
+                    {% for item in rework_breakdown %}
+                    <li class="text-muted small d-flex justify-content-between">
+                        <span>{{ item.defect_type }}</span>
+                        <span class="fw-bold text-success">{{ item.qty }} pcs</span>
+                    </li>
+                    {% endfor %}
+                    {% else %}
+                    <li class="text-muted small">No rework logged for selected filters.</li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card-body">
+                <div class="small text-muted text-uppercase fw-bold">Quality Rejects (Current)</div>
+                <div class="h3 fw-bold text-danger mb-1">{{ total_rejected_pcs }}</div>
+                <div class="small text-muted text-uppercase fw-bold mt-3">Final Rejects (After rework)</div>
+                <div class="h3 fw-bold text-danger">{{ final_rejected_pcs }}</div>
+                <div class="form-text text-muted mt-2">Final rejects = Rejections recorded − Reworked pieces</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="row g-4 mb-4">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fas fa-chart-line me-2 text-primary"></i>
+                    <h6 class="mb-0 fw-bold">7-Day Production Trend (Plan vs Actual)</h6>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-secondary chart-data-btn"
+                    data-chart-title="7-Day Trend data"
+                    data-chart-columns='[{"key":"date","label":"Date"},{"key":"planned","label":"Planned"},{"key":"actual","label":"Actual"},{"key":"final_ok","label":"Final OK"},{"key":"variance_vs_plan","label":"Final OK vs Plan"},{"key":"actual_to_final_loss","label":"Actual to Final Loss"},{"key":"plan_attainment_pct","label":"Plan Attainment %"}]'
+                    data-chart-rows='{{ trend_table | tojson | safe }}'>
+                    View Data
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="chart-fixed chart-sm">
+                    <canvas id="trendChart"></canvas>
+                </div>
+                <div id="trendChartInsight" class="chart-insight mt-3"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fas fa-chart-bar me-2 text-danger"></i>
+                    <h6 class="mb-0 fw-bold">Defect Type Pareto Analysis</h6>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-secondary chart-data-btn"
+                    data-chart-title="Pareto defect counts"
+                    data-chart-columns='[{"key":"rank","label":"Rank"},{"key":"defect_type","label":"Defect Type"},{"key":"count","label":"Count"},{"key":"share_pct","label":"Share %"},{"key":"cumulative_pct","label":"Cumulative %"}]'
+                    data-chart-rows='{{ pareto_table | tojson | safe }}'>
+                    View Data
+                </button>
+            </div>
+            <div class="card-body">
+                {% if pareto_json != '[]' %}
+                <div class="chart-fixed chart-sm">
+                    <canvas id="paretoChart"></canvas>
+                </div>
+                <div id="paretoChartInsight" class="chart-insight mt-3"></div>
+                {% else %}
+                <div class="text-center py-5 text-muted">
+                    <i class="fas fa-check-circle fa-3x mb-3 opacity-25"></i>
+                    <p>No defects recorded for this date.</p>
+                </div>
+                <div id="paretoChartInsight" class="chart-insight mt-3">No defects were recorded for this date, so defect concentration is 0%.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Shift Performance -->
+<div class="row mb-4">
+    {% for shift in ['A', 'B', 'C'] %}
+    {% if by_shift.get(shift) %}
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-users"></i> {{ shift }} Shift
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6">
+                        <small>Planned</small>
+                        <h5>{{ by_shift[shift].planned }}</h5>
+                    </div>
+                    <div class="col-6">
+                        <small>Actual</small>
+                        <h5>{{ by_shift[shift].actual }}</h5>
+                    </div>
+                </div>
+                <hr>
+                <div class="row text-center">
+                    <div class="col-6">
+                        <small>Machines</small>
+                        <h5>{{ by_shift[shift].machines }}</h5>
+                    </div>
+                    <div class="col-6">
+                        <small>Entries</small>
+                        <h5>{{ by_shift[shift].entries }}</h5>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+</div>
+
+<!-- Charts Row -->
+<div class="row mb-4">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fas fa-chart-pie"></i>
+                    <span class="fw-bold">Plan vs Actual by Machine</span>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-secondary chart-data-btn"
+                    data-chart-title="Plan Vs Actual by Machine"
+                    data-chart-columns='[{"key":"machine","label":"Machine"},{"key":"planned","label":"Planned"},{"key":"actual","label":"Actual"},{"key":"final_ok","label":"Final OK"},{"key":"variance","label":"Final OK vs Plan"},{"key":"actual_to_final_loss","label":"Actual to Final Loss"},{"key":"plan_attainment_pct","label":"Plan Attainment %"},{"key":"share_of_final_ok_pct","label":"Share of Final OK %"}]'
+                    data-chart-rows='{{ machine_table | tojson | safe }}'>
+                    View Data
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="planVsActualChart"></canvas>
+                </div>
+                <div id="planVsActualInsight" class="chart-insight"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fas fa-chart-column"></i>
+                    <span class="fw-bold">Shift Comparison</span>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-secondary chart-data-btn"
+                    data-chart-title="Shift Comparison"
+                    data-chart-columns='[{"key":"shift","label":"Shift"},{"key":"planned","label":"Planned"},{"key":"actual","label":"Actual"},{"key":"final_ok","label":"Final OK"},{"key":"efficiency","label":"Efficiency %"},{"key":"downtime","label":"Downtime (min)"},{"key":"machines","label":"Machines"},{"key":"entries","label":"Entries"},{"key":"variance","label":"Final OK vs Plan"}]'
+                    data-chart-rows='{{ shift_table | tojson | safe }}'>
+                    View Data
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="shiftComparisonChart"></canvas>
+                </div>
+                <div id="shiftComparisonInsight" class="chart-insight"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Underperforming Machines -->
+<div class="row mb-4">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-exclamation-circle"></i> Top 5 Underperforming Machines
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th>Machine</th>
+                                <th>Planned</th>
+                                <th>Actual</th>
+                                <th>Final OK</th>
+                                <th>Efficiency</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for machine in underperforming %}
+                            <tr>
+                                <td><strong>{{ machine.machine }}</strong></td>
+                                <td>{{ machine.planned }}</td>
+                                <td>{{ machine.actual }}</td>
+                                <td>{{ machine.final_ok }}</td>
+                                <td>
+                                    <span class="badge badge-efficiency {{ machine.efficiency | getEfficiencyBadge }}">
+                                        {{ machine.efficiency }}%
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-list-check"></i> Today's Entries ({{ entries|length }})
+            </div>
+            <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                <div class="list-group list-group-flush">
+                    {% for entry in entries %}
+                    <a href="/entry/{{ entry.id }}" class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">{{ entry.machine.machine_name }}</h6>
+                            <span class="badge badge-efficiency {{ entry.efficiency | getEfficiencyBadge }}">
+                                {{ "%.0f" | format(entry.efficiency) }}%
+                            </span>
+                        </div>
+                        <small class="text-muted">
+                            {{ entry.customer.customer_name }} |
+                            Shift {{ entry.shift }} |
+                            Plan: {{ entry.planned_quantity }}, Actual: {{ entry.actual_quantity }}
+                        </small>
+                    </a>
+                    {% else %}
+                    <p class="text-muted text-center py-4">No entries for this date</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Hidden data store for charts (resolves linting errors) -->
+        <div id="dashboardData" class="d-none" data-labels='{{ machine_chart_labels | safe }}'
+            data-planned='{{ machine_chart_planned | safe }}' data-actual='{{ machine_chart_actual | safe }}'
+            data-final='{{ machine_chart_final | safe }}'
+            data-shifts='{{ shift_eff | tojson | safe }}' data-trend-labels='{{ trend_labels | safe }}'
+            data-trend-planned='{{ trend_planned | safe }}' data-trend-actual='{{ trend_actual | safe }}'
+            data-trend-final='{{ trend_final | safe }}'
+            data-pareto='{{ pareto_json | safe }}'>
+        </div>
+        {% endblock %}
+
+{% block extra_js %}
+<script>
+    (() => {
+            const dataStore = document.getElementById('dashboardData');
+            const chartLabels = JSON.parse((dataStore && dataStore.dataset.labels) || '[]');
+            const plannedData = JSON.parse((dataStore && dataStore.dataset.planned) || '[]');
+            const actualData = JSON.parse((dataStore && dataStore.dataset.actual) || '[]');
+            const finalData = JSON.parse((dataStore && dataStore.dataset.final) || '[]');
+            const shiftData = JSON.parse((dataStore && dataStore.dataset.shifts) || '[]');
+            const trendLabels = JSON.parse((dataStore && dataStore.dataset.trendLabels) || '[]');
+            const trendPlanned = JSON.parse((dataStore && dataStore.dataset.trendPlanned) || '[]');
+            const trendActual = JSON.parse((dataStore && dataStore.dataset.trendActual) || '[]');
+            const trendFinal = JSON.parse((dataStore && dataStore.dataset.trendFinal) || '[]');
+            const paretoData = JSON.parse((dataStore && dataStore.dataset.pareto) || '[]');
+            const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
+            const sum = (arr) => (arr || []).reduce((a, b) => a + num(b), 0);
+            const maxWithIndex = (arr) => {
+                if (!arr || !arr.length) return { idx: -1, val: 0 };
+                let idx = 0;
+                for (let i = 1; i < arr.length; i++) if (num(arr[i]) > num(arr[idx])) idx = i;
+                return { idx, val: num(arr[idx]) };
+            };
+            const setInsight = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+
+            // Cascading filters
+            const machineFilter = document.getElementById('machine_id');
+            const customerFilter = document.getElementById('customer_id');
+            const sectionFilter = document.getElementById('section_number');
+            const cutLengthFilter = document.getElementById('cut_length');
+            const operationFilter = document.getElementById('operation_type_id');
+            const resetSelect = (el, label) => { if (!el) return; el.innerHTML = ''; el.add(new Option(label, '')); };
+            const fetchJson = (url) => fetch(url).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+            function loadAllOps() {
+                if (!operationFilter) return Promise.resolve();
+                return fetchJson('/master/api/operations').then(rows => {
+                    resetSelect(operationFilter, 'All');
+                    (rows || []).forEach(op => operationFilter.add(new Option(op.operation_name || op.name, op.id)));
+                    const v = operationFilter.dataset.selected; if (v) operationFilter.value = v;
+                }).catch(() => { });
+            }
+            function loadSections() {
+                if (!customerFilter || !sectionFilter) return Promise.resolve();
+                const cid = customerFilter.value;
+                if (!cid) { resetSelect(sectionFilter, 'All'); resetSelect(cutLengthFilter, 'All'); return loadAllOps(); }
+                return fetchJson('/master/api/sections/' + encodeURIComponent(cid)).then(rows => {
+                    resetSelect(sectionFilter, 'All');
+                    (rows || []).forEach(s => sectionFilter.add(new Option(s.number, s.number)));
+                    const sv = sectionFilter.dataset.selected; if (sv) sectionFilter.value = sv; sectionFilter.dataset.selected = '';
+                    return loadCutLengths();
+                }).catch(() => { resetSelect(sectionFilter, 'All'); resetSelect(cutLengthFilter, 'All'); });
+            }
+            function loadCutLengths() {
+                if (!customerFilter || !sectionFilter || !cutLengthFilter) return Promise.resolve();
+                const cid = customerFilter.value; const sn = sectionFilter.value;
+                if (!cid || !sn) { resetSelect(cutLengthFilter, 'All'); return loadAllOps(); }
+                return fetchJson('/master/api/sections/' + encodeURIComponent(cid)).then(rows => {
+                    const match = (rows || []).find(s => String(s.number) === String(sn));
+                    if (!match) throw new Error('No section');
+                    return fetchJson('/master/api/cut-lengths/' + encodeURIComponent(match.id)).then(cls => ({ match, cls }));
+                }).then(({ match, cls }) => {
+                    resetSelect(cutLengthFilter, 'All');
+                    (cls || []).forEach(cl => cutLengthFilter.add(new Option(String(cl.length), String(cl.length))));
+                    const cv = cutLengthFilter.dataset.selected; if (cv) cutLengthFilter.value = cv; cutLengthFilter.dataset.selected = '';
+                    const mid = machineFilter ? machineFilter.value : '';
+                    const clMatch = (cls || []).find(x => String(x.length) === String(cutLengthFilter.value));
+                    if (!mid || !cid || !sn || !clMatch) return loadAllOps();
+                    return fetchJson('/master/api/operations/by-combo?machine_id=' + encodeURIComponent(mid) + '&customer_id=' + encodeURIComponent(cid) + '&section_id=' + encodeURIComponent(match.id) + '&cut_length_id=' + encodeURIComponent(clMatch.id))
+                        .then(ops => {
+                            if (!ops || !ops.length) return loadAllOps();
+                            resetSelect(operationFilter, 'All');
+                            ops.forEach(op => operationFilter.add(new Option(op.operation_name || op.name, op.id || op.operation_type_id)));
+                            const ov = operationFilter.dataset.selected; if (ov) operationFilter.value = ov;
+                        }).catch(() => loadAllOps());
+                }).catch(() => { resetSelect(cutLengthFilter, 'All'); });
+            }
+            if (customerFilter) customerFilter.addEventListener('change', loadSections);
+            if (sectionFilter) sectionFilter.addEventListener('change', loadCutLengths);
+            if (cutLengthFilter) cutLengthFilter.addEventListener('change', loadCutLengths);
+            if (machineFilter) machineFilter.addEventListener('change', loadCutLengths);
+            if (customerFilter && customerFilter.value) loadSections(); else loadAllOps();
+
+            const chartReady = !!window.Chart;
+            if (!chartReady) {
+                setInsight('trendChartInsight', 'Chart library not loaded.');
+                setInsight('paretoChartInsight', 'Chart library not loaded.');
+                setInsight('planVsActualInsight', 'Chart library not loaded.');
+                setInsight('shiftComparisonInsight', 'Chart library not loaded.');
+            }
+
+            const trendCanvas = document.getElementById('trendChart');
+            if (chartReady && trendCanvas) {
+                new Chart(trendCanvas.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: trendLabels.map(d => new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })),
+                        datasets: [
+                            { label: 'Planned', data: trendPlanned, borderColor: chartColors.blue, backgroundColor: 'rgba(52,152,219,0.08)', fill: true, tension: 0.25 },
+                            { label: 'Actual', data: trendActual, borderColor: chartColors.green, backgroundColor: 'rgba(46,204,113,0.08)', fill: true, tension: 0.25 },
+                            { label: 'Final OK', data: trendFinal, borderColor: '#8e44ad', backgroundColor: 'rgba(142,68,173,0.08)', fill: true, tension: 0.25 }
+                        ]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' } }, scales: { y: { beginAtZero: true } } }
+                });
+            }
+            const paretoCanvas = document.getElementById('paretoChart');
+            if (chartReady && paretoCanvas && paretoData.length) {
+                new Chart(paretoCanvas.getContext('2d'), {
+                    type: 'bar',
+                    data: { labels: paretoData.map(d => d.label), datasets: [{ label: 'Defect Count', data: paretoData.map(d => d.value), backgroundColor: chartColors.red }] },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+                });
+            }
+            const planActualEl = document.getElementById('planVsActualChart');
+            if (chartReady && planActualEl) {
+                new Chart(planActualEl.getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: chartLabels,
+                        datasets: [
+                            { label: 'Planned', data: plannedData, backgroundColor: chartColors.blue, borderRadius: 5 },
+                            { label: 'Actual', data: actualData, backgroundColor: chartColors.green, borderRadius: 5 },
+                            { label: 'Final OK', data: finalData, backgroundColor: '#8e44ad', borderRadius: 5 }
+                        ]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' } }, scales: { y: { beginAtZero: true } } }
+                });
+            }
+            const shiftEl = document.getElementById('shiftComparisonChart');
+            if (chartReady && shiftEl) {
+                new Chart(shiftEl.getContext('2d'), {
+                    type: 'radar',
+                    data: { labels: ['A Shift', 'B Shift', 'C Shift'], datasets: [{ label: 'Efficiency %', data: shiftData, backgroundColor: 'rgba(52, 152, 219, 0.2)', borderColor: chartColors.blue, borderWidth: 2, pointBackgroundColor: chartColors.blue }] },
+                    options: { responsive: true, maintainAspectRatio: false, scales: { r: { beginAtZero: true, max: 100 } } }
+                });
+            }
+            const oeeEl = document.getElementById('oeeChart');
+            if (chartReady && oeeEl) {
+                const oeeValues = [{{ oee_metrics.availability }}, {{ oee_metrics.performance }}, {{ oee_metrics.quality }}];
+                new Chart(oeeEl.getContext('2d'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Availability', 'Performance', 'Quality'].map((n, i) => `${n} (${Number(oeeValues[i] || 0).toFixed(1)}%)`),
+                        datasets: [{ data: oeeValues, backgroundColor: [chartColors.blue, chartColors.orange, chartColors.green] }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom' },
+                            tooltip: {
+                                callbacks: {
+                                    label: (ctx) => `${ctx.label}: ${Number(ctx.parsed || 0).toFixed(1)}%`
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            const totalPlanByMachine = sum(plannedData);
+            const totalActualByMachine = sum(actualData);
+            const totalFinalByMachine = sum(finalData);
+            const planGap = totalActualByMachine - totalPlanByMachine;
+            const finalGap = totalFinalByMachine - totalActualByMachine;
+            const planGapPct = totalPlanByMachine > 0 ? (planGap / totalPlanByMachine * 100) : 0;
+            const topActualMachine = maxWithIndex(actualData);
+            const topActualMachineName = topActualMachine.idx >= 0 ? (chartLabels[topActualMachine.idx] || 'N/A') : 'N/A';
+            const topFinalMachine = maxWithIndex(finalData);
+            const topFinalMachineName = topFinalMachine.idx >= 0 ? (chartLabels[topFinalMachine.idx] || 'N/A') : 'N/A';
+            const finalGapLabel = finalGap >= 0 ? `+${finalGap.toFixed(0)}` : finalGap.toFixed(0);
+            setInsight('planVsActualInsight', `Across ${chartLabels.length} machines, actual output is ${totalActualByMachine.toFixed(0)} vs plan ${totalPlanByMachine.toFixed(0)} (${planGap >= 0 ? '+' : ''}${planGap.toFixed(0)}, ${planGapPct.toFixed(1)}%). Final OK is ${totalFinalByMachine.toFixed(0)} (${finalGapLabel} vs actual). Highest final okay is ${topFinalMachineName} at ${topFinalMachine.val.toFixed(0)}.`);
+            const shiftLabels = ['A Shift', 'B Shift', 'C Shift'];
+            const topShift = maxWithIndex(shiftData);
+            const avgShiftEff = shiftData.length ? (sum(shiftData) / shiftData.length) : 0;
+            setInsight('shiftComparisonInsight', `Average shift efficiency is ${avgShiftEff.toFixed(1)}%. Best-performing shift is ${topShift.idx >= 0 ? shiftLabels[topShift.idx] : 'N/A'} at ${topShift.val.toFixed(1)}%.`);
+            const totalTrendPlanned = sum(trendPlanned);
+            const totalTrendActual = sum(trendActual);
+            const totalTrendFinal = sum(trendFinal);
+            const trendGap = totalTrendActual - totalTrendPlanned;
+            const trendFinalGap = totalTrendFinal - totalTrendActual;
+            const bestTrendDay = maxWithIndex(trendActual);
+            const bestFinalDay = maxWithIndex(trendFinal);
+            const trendFinalGapLabel = trendFinalGap >= 0 ? `+${trendFinalGap.toFixed(0)}` : trendFinalGap.toFixed(0);
+            const finalPeakLabel = bestFinalDay.idx >= 0 ? `${trendLabels[bestFinalDay.idx]} with ${bestFinalDay.val.toFixed(0)} final OK` : 'N/A';
+            setInsight('trendChartInsight', `Trend window shows planned ${totalTrendPlanned.toFixed(0)}, actual ${totalTrendActual.toFixed(0)} (${trendGap >= 0 ? '+' : ''}${trendGap.toFixed(0)}) and final OK ${totalTrendFinal.toFixed(0)} (${trendFinalGapLabel} vs actual). Peak final day is ${finalPeakLabel}.`);
+            if (paretoData.length > 0) {
+                const totalDefects = sum(paretoData.map(d => d.value));
+                const topDefect = paretoData[0];
+                const topShare = totalDefects > 0 ? (num(topDefect.value) / totalDefects * 100) : 0;
+                setInsight('paretoChartInsight', `Total logged defects are ${totalDefects.toFixed(0)}. Top defect type is ${topDefect.label} with ${num(topDefect.value).toFixed(0)} (${topShare.toFixed(1)}%).`);
+            }
+    })();
+        </script>
+        {% endblock %}

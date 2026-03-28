@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block page_title %}Bulk Upload{% endblock %}
+{% block page_subtitle %}Import Excel Data{% endblock %}
+
+{% block title %}Bulk Upload Production Data{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-xl-6 col-lg-8 col-md-10">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                <h6 class="m-0 font-weight-bold text-primary">Bulk Upload Production Entries (CSV)</h6>
+                <a href="{{ url_for('web.production_entry_form') }}" class="btn btn-sm btn-light">Back to Form</a>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <h6><i class="fas fa-info-circle"></i> Instructions:</h6>
+                    <ul class="mb-0 small">
+                        <li>Upload a CSV file with the following columns: `production_date` (YYYY-MM-DD), `shift`
+                            (A/B/C), `machine_id`, `customer_id`, `planned_quantity`, `actual_quantity`, `remarks`.</li>
+                        <li>Ensure all ID fields (`machine_id`, `customer_id`) correspond to existing records in the
+                            master data.</li>
+                        <li>Download a <a href="#" onclick="downloadTemplate()">template CSV</a> if you're not sure
+                            about the format.</li>
+                    </ul>
+                </div>
+
+                <form id="uploadForm" enctype="multipart/form-data">
+                    <div class="mb-4">
+                        <label for="csvFile" class="form-label">Select CSV File</label>
+                        <input class="form-control" type="file" id="csvFile" name="file" accept=".csv" required>
+                    </div>
+
+                    <div id="uploadStatus" class="mb-3 d-none">
+                        <div class="progress mb-2" style="height: 10px;">
+                            <div id="uploadProgress" class="progress-bar progress-bar-striped progress-bar-animated"
+                                role="progressbar" style="width: 0%"></div>
+                        </div>
+                        <small id="statusText" class="text-muted">Uploading...</small>
+                    </div>
+
+                    <div id="resultsArea" class="mb-3 d-none">
+                        <div class="alert" id="resultsAlert"></div>
+                        <div id="errorList" class="small text-danger" style="max-height: 200px; overflow-y: auto;">
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary" id="submitBtn">
+                            <i class="fas fa-upload me-2"></i> Upload and Import
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function downloadTemplate() {
+        const headers = "production_date,shift,machine_id,customer_id,planned_quantity,actual_quantity,remarks";
+        const blob = new Blob([headers], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.setAttribute('hidden', '');
+        a.setAttribute('href', url);
+        a.setAttribute('download', 'production_template.csv');
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+
+    document.getElementById('uploadForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+
+        const fileInput = document.getElementById('csvFile');
+        if (!fileInput.files.length) return;
+
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+
+        const submitBtn = document.getElementById('submitBtn');
+        const statusDiv = document.getElementById('uploadStatus');
+        const progress = document.getElementById('uploadProgress');
+        const statusText = document.getElementById('statusText');
+        const resultsArea = document.getElementById('resultsArea');
+        const resultsAlert = document.getElementById('resultsAlert');
+        const errorList = document.getElementById('errorList');
+
+        submitBtn.disabled = true;
+        statusDiv.classList.remove('d-none');
+        resultsArea.classList.add('d-none');
+        progress.style.width = '50%';
+        statusText.innerText = 'Processing file...';
+
+        try {
+            const response = await fetch('/api/import/csv', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+            progress.style.width = '100%';
+
+            resultsArea.classList.remove('d-none');
+            errorList.innerHTML = '';
+
+            if (response.ok) {
+                resultsAlert.className = 'alert alert-success';
+                resultsAlert.innerHTML = `<i class="fas fa-check-circle"></i> ${data.message}`;
+
+                if (data.errors && data.errors.length > 0) {
+                    resultsAlert.innerHTML += `<br><small>Some rows had errors (${data.errors.length})</small>`;
+                    data.errors.forEach(err => {
+                        errorList.innerHTML += `<div>• ${err}</div>`;
+                    });
+                }
+            } else {
+                resultsAlert.className = 'alert alert-danger';
+                resultsAlert.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${data.error || 'Upload failed'}`;
+            }
+        } catch (error) {
+            resultsArea.classList.remove('d-none');
+            resultsAlert.className = 'alert alert-danger';
+            resultsAlert.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Connection error. Please try again.`;
+        } finally {
+            submitBtn.disabled = false;
+            statusText.innerText = 'Upload complete';
+        }
+    });
+</script>
+{% endblock %}

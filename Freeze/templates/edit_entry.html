@@ -1,0 +1,1754 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<style>
+    .auto-calc-field {
+        background: #eef2f7 !important;
+        border: 1px dashed #b8c4d6 !important;
+        color: #5b6472;
+        cursor: not-allowed;
+    }
+
+    .auto-calc-field::placeholder {
+        color: #7a8699;
+        opacity: 1;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-xl-9 col-lg-10">
+            <div class="card shadow-lg border-0 rounded-4 overflow-hidden">
+                <div class="card-header bg-warning bg-gradient text-dark p-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h3 class="mb-1 fw-bold"><i class="fas fa-edit me-2"></i>Edit Production Entry #{{
+                                entry.entry_no }}</h3>
+                            <p class="mb-0 opacity-75">Update machine output, times, and downtime records</p>
+                        </div>
+                        <div class="text-end text-muted small">
+                            ID: {{ entry.id }}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-body p-4 p-md-5">
+                    <form id="productionEntryForm" method="POST" novalidate
+                        action="{{ url_for('web.edit_entry', entry_id=entry.id) }}">
+                        <!-- Shift Selection -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold d-block mb-3">Recorded Shift(s)</label>
+                            <div class="d-flex flex-wrap gap-2">
+                                <button type="button"
+                                    class="btn btn-outline-primary shift-pill rounded-pill px-4 py-2 {% if 'A' in entry.shift %}active{% endif %}"
+                                    data-shift="A"><i class="fas fa-sun me-2"></i>Shift A</button>
+                                <button type="button"
+                                    class="btn btn-outline-primary shift-pill rounded-pill px-4 py-2 {% if 'B' in entry.shift %}active{% endif %}"
+                                    data-shift="B"><i class="fas fa-cloud-sun me-2"></i>Shift B</button>
+                                <button type="button"
+                                    class="btn btn-outline-primary shift-pill rounded-pill px-4 py-2 {% if 'C' in entry.shift %}active{% endif %}"
+                                    data-shift="C"><i class="fas fa-moon me-2"></i>Shift C</button>
+                            </div>
+                            <input type="hidden" name="shift" id="shift_hidden" value="{{ entry.shift }}" required>
+                        </div>
+
+                        <!-- Production Date & Times -->
+                        <div class="row g-4 mb-4">
+                            <div class="col-md-4">
+                                <label for="production_date" class="form-label fw-bold">Production Date</label>
+                                <input type="date" class="form-control" id="production_date" name="production_date"
+                                    value="{{ entry.production_date.strftime('%Y-%m-%d') }}" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="start_time" class="form-label fw-bold text-primary">Start Time</label>
+                                <input type="datetime-local" class="form-control" id="start_time" name="start_time"
+                                    value="{{ entry.start_time.strftime('%Y-%m-%dT%H:%M') }}" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="end_time" class="form-label fw-bold text-primary">End Time</label>
+                                <input type="datetime-local" class="form-control" id="end_time" name="end_time"
+                                    value="{{ entry.end_time.strftime('%Y-%m-%dT%H:%M') }}" required>
+                            </div>
+                        </div>
+
+                        <hr class="my-4 opacity-25">
+
+                        <!-- Machine/Customer/Section/CL/Operation -->
+                        <div class="row g-4 mb-4">
+                            <div class="col-md-4">
+                                <label for="shed_id" class="form-label fw-bold">Shed</label>
+                                <select class="form-select" id="shed_id" name="shed_id" data-current-machine-id="{{ entry.machine_id }}">
+                                    <option value="">Select Shed</option>
+                                    {% for shed in sheds %}
+                                    <option value="{{ shed.id }}" {% if entry.machine and entry.machine.shed_id == shed.id %}selected{% endif %}>
+                                        {{ shed.shed_name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="machine_id" class="form-label fw-bold">Machine</label>
+                                <select class="form-select" id="machine_id" name="machine_id" required>
+                                    <option value="">Select Shed First</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="customer_id" class="form-label fw-bold">Customer</label>
+                                <select class="form-select" id="customer_id" name="customer_id" required>
+                                    <option value="">Select Customer</option>
+                                    {% for customer in customers %}
+                                    <option value="{{ customer.id }}" {% if entry.customer_id==customer.id %}selected{%
+                                        endif %}>
+                                        {{ customer.customer_name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row g-4 mb-4">
+                            <div class="col-md-4">
+                                <label for="section_id" class="form-label fw-bold">Section Number</label>
+                                <select class="form-select" id="section_id"
+                                    data-current-section="{{ entry.section_number or '' }}"
+                                    data-current-section-id="{{ current_section_id or '' }}">
+                                    <option value="">Loading sections...</option>
+                                </select>
+                                <input type="hidden" name="section_number" id="section_number_hidden"
+                                    value="{{ entry.section_number or '' }}">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="cl_id" class="form-label fw-bold">Cut Length (mm)</label>
+                                <select class="form-select" id="cl_id"
+                                    data-current-cutlength="{{ entry.cutlength if entry.cutlength is not none else '' }}"
+                                    data-current-cutlength-id="{{ current_cutlength_id or '' }}">
+                                    <option value="">Select section first</option>
+                                </select>
+                                <input type="hidden" name="cutlength" id="cutlength_hidden"
+                                    value="{{ entry.cutlength if entry.cutlength is not none else '' }}">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="operation_type_id" class="form-label fw-bold">Operation / Process</label>
+                                <select class="form-select" id="operation_type_id" name="operation_type_id[]" required
+                                    data-current-operation="{{ current_operation_id or '' }}">
+                                    <option value="">Select section + cut length first</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <hr class="my-4 opacity-25">
+
+                        <!-- Quantities & Metrics -->
+                        <div class="row g-3 mb-4 align-items-end">
+                            <div class="col-lg col-md-6">
+                                <label for="planned_quantity" class="form-label fw-bold">Planned Qty</label>
+                                <input type="number" class="form-control" id="planned_quantity" name="planned_quantity"
+                                    value="{{ entry.planned_quantity }}" required>
+                            </div>
+                            <div class="col-lg col-md-6">
+                                <label for="actual_quantity" class="form-label fw-bold">Actual OK Qty</label>
+                                <input type="number" class="form-control" id="actual_quantity" name="actual_quantity"
+                                    value="{{ entry.actual_quantity }}">
+                            </div>
+                            <div class="col-lg col-md-6">
+                                <label for="self_rejection_weight_per_pcs" class="form-label fw-bold">Weight/PC (kg)</label>
+                                <input type="number" step="0.001" class="form-control fw-bold" id="self_rejection_weight_per_pcs"
+                                    name="self_rejection_weight_per_pcs" value="{{ '%.3f'|format(entry.self_rejection_weight_per_pcs) if entry.self_rejection_weight_per_pcs else '' }}" placeholder="0" min="0">
+                            </div>
+                            <div class="col-lg col-md-6">
+                                <label for="ideal_cycle_time" class="form-label fw-bold">Ideal C/Time/pc
+                                    (Sum)</label>
+                                <input type="number" step="0.001" class="form-control auto-calc-field" id="ideal_cycle_time"
+                                    name="ideal_cycle_time" value="{{ entry.ideal_cycle_time }}" placeholder="Auto calculated" readonly>
+                            </div>
+                            <div class="col-lg col-md-6">
+                                <label for="production_miss" class="form-label fw-bold text-danger">Prod Miss
+                                    (Pcs)</label>
+                                <input type="number"
+                                    class="form-control border-danger bg-danger bg-opacity-10 text-danger fw-bold auto-calc-field"
+                                    id="production_miss" value="{{ entry.planned_quantity - entry.actual_quantity }}"
+                                    placeholder="Auto calculated" readonly>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <div class="card border border-danger border-opacity-25 shadow-sm rounded-4 overflow-hidden">
+                                <div class="card-header bg-danger bg-opacity-10 py-3 border-0 d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0 fw-bold text-dark"><i class="fas fa-trash-alt me-2"></i>Production Scrap Management</h6>
+                                    <button type="button" id="addSelfRejectionRowBtn" class="btn btn-sm btn-outline-danger rounded-pill px-3">
+                                        <i class="fas fa-plus me-1"></i> Add Self Rejection
+                                    </button>
+                                </div>
+                                <div class="card-body p-3">
+                                    <input type="hidden" id="self_rejection_qty" name="self_rejection_qty" value="{{ entry.self_rejection_qty or 0 }}">
+                                    <div class="row g-3 mb-3 align-items-end">
+                                        <div class="col-lg-3 col-md-3 col-sm-6 order-1">
+                                            <label for="total_machining_scrap_kg" class="form-label fw-bold small">Total Machining Scrap (kg)</label>
+                                            <input type="number" step="0.001" class="form-control fw-bold text-danger" id="total_machining_scrap_kg" name="total_machining_scrap_kg" value="{{ '%.3f'|format(entry.machining_scrap_weight_kg) if entry.machining_scrap_weight_kg else '' }}" placeholder="0" min="0.001" required>
+                                        </div>
+                                        <div class="col-lg-3 col-md-3 col-sm-6 order-2">
+                                            <label for="self_rejection_total_pcs" class="form-label fw-bold small">Total Self Rejection PCS</label>
+                                            <input type="number" class="form-control fw-bold text-danger auto-calc-field" id="self_rejection_total_pcs" value="{{ entry.self_rejection_qty or 0 }}" placeholder="Auto calculated" readonly>
+                                        </div>
+                                        <div class="col-lg-3 col-md-3 col-sm-6 order-3">
+                                            <label for="self_rejection_total_all_kg" class="form-label fw-bold small">Total Self Rejection (All)</label>
+                                            <input type="text" class="form-control fw-bold text-danger auto-calc-field" id="self_rejection_total_all_kg" value="{{ '%.3f'|format(((entry.self_rejection_weight_per_pcs or 0) * (entry.self_rejection_qty or 0)) + (entry.machining_scrap_weight_kg or 0)) }}" placeholder="Auto calculated" readonly>
+                                        </div>
+                                        <div class="col-lg-3 col-md-3 col-sm-6 order-4">
+                                            <label for="self_rejection_total_kg" class="form-label fw-bold small">Total Self Rejection KGs</label>
+                                            <input type="text" class="form-control fw-bold text-danger auto-calc-field" id="self_rejection_total_kg" value="{{ '%.3f'|format((entry.self_rejection_weight_per_pcs or 0) * (entry.self_rejection_qty or 0)) }}" placeholder="Auto calculated" readonly>
+                                        </div>
+                                    </div>
+                                    <div class="table-responsive mb-3">
+                                        <table class="table table-sm align-middle mb-0" id="selfRejectionTable">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th style="width:60%">Defect Type</th>
+                                                    <th style="width:25%">Reject PCS Qty</th>
+                                                    <th style="width:15%" class="text-center">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="self_rejection_container">
+                                                {% for defect_row in entry.self_rejection_defects %}
+                                                <tr class="self-rejection-row">
+                                                    <td>
+                                                        <select class="form-select self-rejection-defect" name="self_rejection_defect_type_id[]">
+                                                            <option value="">Select Defect...</option>
+                                                            {% for defect in defect_types %}
+                                                            <option value="{{ defect.id }}" {% if defect_row.defect_type_id == defect.id %}selected{% endif %}>{{ defect.defect_name }}</option>
+                                                            {% endfor %}
+                                                        </select>
+                                                    </td>
+                                                    <td>
+                                                        <div class="input-group">
+                                                            <input type="number" class="form-control self-rejection-qty" name="self_rejection_defect_qty[]" value="{{ defect_row.reject_qty or 0 }}" min="0">
+                                                            <span class="input-group-text">PCS</span>
+                                                        </div>
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <button type="button" class="btn btn-sm btn-link text-danger remove-self-rejection-row">
+                                                            <i class="fas fa-times-circle"></i>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                                {% else %}
+                                                <tr class="self-rejection-row">
+                                                    <td>
+                                                        <select class="form-select self-rejection-defect" name="self_rejection_defect_type_id[]">
+                                                            <option value="">Select Defect...</option>
+                                                            {% for defect in defect_types %}
+                                                            <option value="{{ defect.id }}">{{ defect.defect_name }}</option>
+                                                            {% endfor %}
+                                                        </select>
+                                                    </td>
+                                                    <td>
+                                                        <div class="input-group">
+                                                            <input type="number" class="form-control self-rejection-qty" name="self_rejection_defect_qty[]" value="0" min="0">
+                                                            <span class="input-group-text">PCS</span>
+                                                        </div>
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <button type="button" class="btn btn-sm btn-link text-danger remove-self-rejection-row" style="display:none;">
+                                                            <i class="fas fa-times-circle"></i>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <template id="self_rejection_row_template">
+                                        <tr class="self-rejection-row">
+                                            <td>
+                                                <select class="form-select self-rejection-defect" name="self_rejection_defect_type_id[]">
+                                                    <option value="">Select Defect...</option>
+                                                    {% for defect in defect_types %}
+                                                    <option value="{{ defect.id }}">{{ defect.defect_name }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </td>
+                                            <td>
+                                                <div class="input-group">
+                                                    <input type="number" class="form-control self-rejection-qty" name="self_rejection_defect_qty[]" value="0" min="0">
+                                                    <span class="input-group-text">PCS</span>
+                                                </div>
+                                            </td>
+                                            <td class="text-center">
+                                                <button type="button" class="btn btn-sm btn-link text-danger remove-self-rejection-row">
+                                                    <i class="fas fa-times-circle"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Metric Summary Rows -->
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Total Shift Time (Mins)</label>
+                                <input type="number" class="form-control fw-bold auto-calc-field" id="total_shift_minutes"
+                                    placeholder="Auto calculated" readonly>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold text-warning">Total Downtime (Mins)</label>
+                                <input type="number"
+                                    class="form-control bg-warning bg-opacity-10 border-warning fw-bold auto-calc-field"
+                                    id="total_downtime_edit" value="{{ entry.downtime_minutes }}" placeholder="Auto calculated" readonly>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold text-primary">Available Machine Mins</label>
+                                <input type="number"
+                                    class="form-control bg-primary bg-opacity-10 border-primary fw-bold auto-calc-field"
+                                    id="total_time_taken_minutes" name="total_time_taken_minutes"
+                                    value="{{ entry.total_time_taken_minutes }}" placeholder="Auto calculated" readonly>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Total Ideal Time (Mins)</label>
+                                <input type="number" step="0.1" class="form-control auto-calc-field"
+                                    id="total_ideal_time_minutes" name="total_ideal_time_minutes"
+                                    value="{{ entry.total_ideal_time_minutes }}" placeholder="Auto calculated" readonly>
+                                <div class="form-text small">Actual Qty &times; Ideal Cycle Time/Pc</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold text-danger">Total Unaccounted Time (Mins)</label>
+                                <input type="number" step="0.1"
+                                    class="form-control border-danger bg-danger bg-opacity-10 text-danger fw-bold auto-calc-field"
+                                    id="total_unaccounted_time" placeholder="Auto calculated" readonly>
+                                <div class="form-text small">Available Mins &minus; Total Ideal Time</div>
+                            </div>
+                        </div>
+
+                        <hr class="my-4 opacity-25">
+
+                        <!-- Downtime Section (Simplified display for edit, usually updated via records but here for quick fix) -->
+                        <div class="mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <label class="form-label fw-bold mb-0">Planned Downtime Details</label>
+                                <button type="button" id="toggleDowntimeBtn" class="btn btn-sm btn-outline-warning">
+                                    <i class="fas fa-clock me-1 text-dark"></i> Manage Downtime
+                                </button>
+                            </div>
+
+                            <div id="downtimeSection" class="p-3 border rounded mb-3 bg-light bg-opacity-50"
+                                style="display:none;">
+                                <div id="downtime_container">
+                                    {% for dt in entry.planned_downtime %}
+                                    <div class="row g-2 mb-2 downtime-row"
+                                        data-is-fixed="{{ 'true' if dt.reason and dt.reason.is_fixed else 'false' }}">
+                                        <div class="col-md-7">
+                                            <select class="form-select form-select-sm downtime-reason"
+                                                name="downtime_reason_id[]">
+                                                <option value="{{ dt.reason_id }}">{{ dt.reason.reason_name }}</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <input type="number" class="form-control form-control-sm downtime-duration"
+                                                name="downtime_minutes[]" value="{{ dt.duration_minutes }}"
+                                                placeholder="Mins">
+                                        </div>
+                                        <div class="col-md-1">
+                                            <button type="button"
+                                                class="btn btn-sm btn-link text-danger remove-downtime"><i
+                                                    class="fas fa-times-circle"></i></button>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+
+                                <!-- Template for new downtime row -->
+                                <div id="downtime_template" style="display:none;">
+                                    <div class="row g-2 mb-2 downtime-row">
+                                        <div class="col-md-7">
+                                            <select class="form-select form-select-sm downtime-reason"
+                                                name="downtime_reason_id[]">
+                                                <option value="">Select Reason</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <input type="number" class="form-control form-control-sm downtime-duration"
+                                                name="downtime_minutes[]" placeholder="Mins">
+                                        </div>
+                                        <div class="col-md-1">
+                                            <button type="button"
+                                                class="btn btn-sm btn-link text-danger remove-downtime"><i
+                                                    class="fas fa-times-circle"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="button" id="addMoreDowntime"
+                                    class="btn btn-link btn-sm text-warning p-0 text-decoration-none">
+                                    <i class="fas fa-plus-circle me-1"></i>Add Another
+                                </button>
+                            </div>
+
+                            <!-- Fixed Downtime Info -->
+                            <div class="alert alert-info py-2 px-3 small mb-0">
+                                <span>Total Planned Downtime: <strong><span id="total_planned_downtime_display">{{
+                                            entry.downtime_minutes }}</span></strong> mins</span>
+                                <input type="hidden" name="total_planned_downtime" id="total_planned_dt_hidden"
+                                    value="{{ entry.downtime_minutes }}">
+                            </div>
+                        </div>
+
+                        <hr class="my-4 opacity-25">
+
+                        <!-- Operators (Multi) -->
+                        <div class="mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <label class="form-label fw-bold text-primary mb-0"><i
+                                        class="fas fa-users me-2"></i>Machine Operators & Times</label>
+                                <button type="button" id="add_operator_btn" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-plus me-1"></i> Add Operator
+                                </button>
+                            </div>
+                            <div id="operators_container">
+                                {% for op in entry.operators %}
+                                <div
+                                    class="operator-row p-3 rounded mb-3 border-start border-primary border-4 bg-light bg-opacity-50">
+                                    <div class="row g-3">
+                                        <div class="col-md-4">
+                                            <label class="small text-muted mb-1 d-block">Emp Code</label>
+                                            <div class="input-group input-group-sm">
+                                                <span class="input-group-text"><i class="fas fa-id-card"></i></span>
+                                                <input type="text" class="form-control operator-code"
+                                                    value="{{ op.operator_info.emp_code }}" placeholder="ID" required>
+                                            </div>
+                                            <input type="text"
+                                                class="form-control form-control-sm mt-1 bg-light border-0 operator-name-display"
+                                                value="{{ op.operator_info.emp_name }}" readonly>
+                                            <input type="hidden" name="operator_id[]" class="operator-id-hidden"
+                                                value="{{ op.operator_emp_id }}">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="small text-muted mb-1 d-block">Start Time</label>
+                                            <input type="datetime-local"
+                                                class="form-control form-control-sm op-start-time"
+                                                name="op_start_time[]"
+                                                value="{{ op.start_time.strftime('%Y-%m-%dT%H:%M') }}" required>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="small text-muted mb-1 d-block">End Time</label>
+                                            <div class="input-group input-group-sm">
+                                                <input type="datetime-local"
+                                                    class="form-control form-control-sm op-end-time"
+                                                    name="op_end_time[]"
+                                                    value="{{ op.end_time.strftime('%Y-%m-%dT%H:%M') }}" required>
+                                                <button type="button" class="btn btn-outline-danger remove-operator" {%
+                                                    if entry.operators|length==1 %}style="display:none;" {% endif %}><i
+                                                        class="fas fa-trash"></i></button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+
+                            <!-- Template for new operator row -->
+                            <div id="operator_template" style="display:none;">
+                                <div
+                                    class="operator-row p-3 rounded mb-3 border-start border-primary border-4 bg-light bg-opacity-50">
+                                    <div class="row g-3">
+                                        <div class="col-md-4">
+                                            <label class="small text-muted mb-1 d-block">Emp Code</label>
+                                            <div class="input-group input-group-sm">
+                                                <span class="input-group-text"><i class="fas fa-id-card"></i></span>
+                                                <input type="text" class="form-control operator-code" placeholder="ID">
+                                            </div>
+                                            <input type="text"
+                                                class="form-control form-control-sm mt-1 bg-light border-0 operator-name-display"
+                                                readonly>
+                                            <input type="hidden" name="operator_id[]" class="operator-id-hidden">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="small text-muted mb-1 d-block">Start Time</label>
+                                            <input type="datetime-local"
+                                                class="form-control form-control-sm op-start-time"
+                                                name="op_start_time[]">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="small text-muted mb-1 d-block">End Time</label>
+                                            <div class="input-group input-group-sm">
+                                                <input type="datetime-local"
+                                                    class="form-control form-control-sm op-end-time"
+                                                    name="op_end_time[]">
+                                                <button type="button" class="btn btn-outline-danger remove-operator"><i
+                                                        class="fas fa-trash"></i></button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Shift Supervisors (Multi) -->
+                        <div class="mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <label class="form-label fw-bold text-success mb-0"><i
+                                        class="fas fa-user-tie me-2"></i>Shift Supervisors & Times</label>
+                                <button type="button" id="add_supervisor_btn" class="btn btn-sm btn-outline-success">
+                                    <i class="fas fa-plus me-1"></i> Add Supervisor
+                                </button>
+                            </div>
+                            <div id="supervisors_container">
+                                {% for sup in entry.supervisors %}
+                                <div
+                                    class="supervisor-row p-3 rounded mb-3 border-start border-success border-4 bg-light bg-opacity-50">
+                                    <div class="row g-3">
+                                        <div class="col-md-4">
+                                            <label class="small text-muted mb-1 d-block">Supervisor Code</label>
+                                            <div class="input-group input-group-sm">
+                                                <span class="input-group-text"><i class="fas fa-id-badge"></i></span>
+                                                <input type="text" class="form-control supervisor-code"
+                                                    value="{{ sup.supervisor_info.emp_code }}" placeholder="ID"
+                                                    required>
+                                            </div>
+                                            <input type="text"
+                                                class="form-control form-control-sm mt-1 bg-light border-0 supervisor-name-display"
+                                                value="{{ sup.supervisor_info.emp_name }}" readonly>
+                                            <input type="hidden" name="supervisor_id[]" class="supervisor-id-hidden"
+                                                value="{{ sup.supervisor_emp_id }}">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="small text-muted mb-1 d-block">Start Time</label>
+                                            <input type="datetime-local"
+                                                class="form-control form-control-sm sup-start-time"
+                                                name="sup_start_time[]"
+                                                value="{{ sup.start_time.strftime('%Y-%m-%dT%H:%M') }}" required>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="small text-muted mb-1 d-block">End Time</label>
+                                            <div class="input-group input-group-sm">
+                                                <input type="datetime-local"
+                                                    class="form-control form-control-sm sup-end-time"
+                                                    name="sup_end_time[]"
+                                                    value="{{ sup.end_time.strftime('%Y-%m-%dT%H:%M') }}" required>
+                                                <button type="button" class="btn btn-outline-danger remove-supervisor"
+                                                    {% if entry.supervisors|length==1 %}style="display:none;" {% endif
+                                                    %}><i class="fas fa-trash"></i></button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+
+                            <!-- Template for new supervisor row -->
+                            <div id="supervisor_template" style="display:none;">
+                                <div
+                                    class="supervisor-row p-3 rounded mb-3 border-start border-success border-4 bg-light bg-opacity-50">
+                                    <div class="row g-3">
+                                        <div class="col-md-4">
+                                            <label class="small text-muted mb-1 d-block">Supervisor Code</label>
+                                            <div class="input-group input-group-sm">
+                                                <span class="input-group-text"><i class="fas fa-id-badge"></i></span>
+                                                <input type="text" class="form-control supervisor-code" placeholder="ID">
+                                            </div>
+                                            <input type="text"
+                                                class="form-control form-control-sm mt-1 bg-light border-0 supervisor-name-display"
+                                                readonly>
+                                            <input type="hidden" name="supervisor_id[]" class="supervisor-id-hidden">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="small text-muted mb-1 d-block">Start Time</label>
+                                            <input type="datetime-local"
+                                                class="form-control form-control-sm sup-start-time"
+                                                name="sup_start_time[]">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="small text-muted mb-1 d-block">End Time</label>
+                                            <div class="input-group input-group-sm">
+                                                <input type="datetime-local"
+                                                    class="form-control form-control-sm sup-end-time"
+                                                    name="sup_end_time[]">
+                                                <button type="button"
+                                                    class="btn btn-outline-danger remove-supervisor"><i
+                                                        class="fas fa-trash"></i></button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="my-4 opacity-25">
+
+                        <div class="mb-4">
+                            <label for="remarks" class="form-label fw-bold">General Remarks / Notes</label>
+                            <textarea class="form-control" id="remarks" name="remarks" rows="2"
+                                placeholder="Note any specific delays or issues...">{{ entry.remarks }}</textarea>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end pt-3 border-top mt-4">
+                            <a href="/entries" class="btn btn-outline-secondary px-4 rounded-pill">Cancel</a>
+                            <button type="submit" class="btn btn-warning btn-lg px-5 shadow-sm rounded-pill"
+                                id="submitBtn">
+                                <i class="fas fa-save me-2 text-dark"></i> Update Record
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Overlap Conflict Modal -->
+<div class="modal fade" id="overlapConflictModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 15px; overflow: hidden;">
+            <div class="modal-header bg-danger text-white border-0 py-3">
+                <h5 class="modal-title fw-bold"><i class="fas fa-exclamation-circle me-2"></i> Overlap Detected</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                    aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div id="conflictDetailsContainer">
+                    <!-- Conflict details will be injected here -->
+                </div>
+            </div>
+            <div class="modal-footer border-0 p-4 pt-0">
+                <button type="button" class="btn btn-secondary px-4 rounded-pill" data-bs-dismiss="modal">OK</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- No Downtime Confirmation Modal -->
+<div class="modal fade" id="confirmNoDowntimeModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 15px;">
+            <div class="modal-header bg-warning text-dark border-0 py-3">
+                <h5 class="modal-title fw-bold"><i class="fas fa-question-circle me-2"></i> No Downtime Recorded?</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4 text-center">
+                <p class="mb-0">You haven't recorded any planned downtime for this shift. Do you want to proceed anyway?
+                </p>
+            </div>
+            <div class="modal-footer border-0 p-4 pt-0 d-flex justify-content-center">
+                <button type="button" class="btn btn-outline-secondary px-4 rounded-pill" data-bs-dismiss="modal">No,
+                    Add Downtime</button>
+                <button type="button" id="forceSubmitBtn" class="btn btn-warning px-4 rounded-pill shadow-sm">Yes,
+                    Proceed</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        // --- ALL DOM ELEMENTS AT THE TOP ---
+        var shiftPills = document.querySelectorAll('.shift-pill');
+        var shiftHidden = document.getElementById('shift_hidden');
+        var startTimeInput = document.getElementById('start_time');
+        var endTimeInput = document.getElementById('end_time');
+        var operatorsContainer = document.getElementById('operators_container');
+        var addOperatorBtn = document.getElementById('add_operator_btn');
+        var supervisorsContainer = document.getElementById('supervisors_container');
+        var addSupervisorBtn = document.getElementById('add_supervisor_btn');
+        var toggleDowntimeBtn = document.getElementById('toggleDowntimeBtn');
+        var downtimeSection = document.getElementById('downtimeSection');
+        var downtimeContainer = document.getElementById('downtime_container');
+        var addMoreDowntime = document.getElementById('addMoreDowntime');
+        var totalDtDisplay = document.getElementById('total_planned_downtime_display');
+        var totalDtHidden = document.getElementById('total_planned_dt_hidden');
+        var totalRuntimeInput = document.getElementById('total_time_taken_minutes');
+        var prodForm = document.getElementById('productionEntryForm');
+        var forceSubmitBtn = document.getElementById('forceSubmitBtn');
+        var plannedQty = document.getElementById('planned_quantity');
+        var actualQty = document.getElementById('actual_quantity');
+        var idealTimeInput = document.getElementById('ideal_cycle_time');
+        var totalIdealInput = document.getElementById('total_ideal_time_minutes');
+        var prodMiss = document.getElementById('production_miss');
+        var shedSelect = document.getElementById('shed_id');
+        var machineSelect = document.getElementById('machine_id');
+        var customerSelect = document.getElementById('customer_id');
+        var sectionSelect = document.getElementById('section_id');
+        var cutLengthSelect = document.getElementById('cl_id');
+        var sectionHiddenInput = document.getElementById('section_number_hidden');
+        var cutLengthHiddenInput = document.getElementById('cutlength_hidden');
+        var operationSelect = document.getElementById('operation_type_id');
+        var selfRejectionContainer = document.getElementById('self_rejection_container');
+        var selfRejectionRowTemplate = document.getElementById('self_rejection_row_template');
+        var addSelfRejectionRowBtn = document.getElementById('addSelfRejectionRowBtn');
+        var selfRejectionQtyInput = document.getElementById('self_rejection_qty');
+        var selfRejectionWeightInput = document.getElementById('self_rejection_weight_per_pcs');
+        var machiningScrapKgInput = document.getElementById('total_machining_scrap_kg');
+        var selfRejectionTotalPcs = document.getElementById('self_rejection_total_pcs');
+        var selfRejectionTotalAllKgInput = document.getElementById('self_rejection_total_all_kg');
+        var selfRejectionTotalKgInput = document.getElementById('self_rejection_total_kg');
+        var confirmModalEl = document.getElementById('confirmNoDowntimeModal');
+        var confirmModal = (confirmModalEl && window.bootstrap && window.bootstrap.Modal)
+            ? new window.bootstrap.Modal(confirmModalEl)
+            : null;
+        var overlapModalEl = document.getElementById('overlapConflictModal');
+        var overlapModal = (overlapModalEl && window.bootstrap && window.bootstrap.Modal)
+            ? new window.bootstrap.Modal(overlapModalEl)
+            : null;
+
+        var downtimeReasons = [];
+        var initializingCombo = true;
+
+        // Function to toggle shift pill visuals and state
+        function toggleShiftPill(shiftCode, shouldBeActive) {
+            var pill = document.querySelector('.shift-pill[data-shift="' + shiftCode + '"]');
+            if (!pill) return;
+
+            var currentlyActive = pill.classList.contains('active');
+            if (currentlyActive !== shouldBeActive) {
+                pill.classList.toggle('active', shouldBeActive);
+                if (shouldBeActive) {
+                    pill.classList.remove('btn-outline-primary');
+                    pill.classList.add('btn-primary');
+                } else {
+                    pill.classList.add('btn-outline-primary');
+                    pill.classList.remove('btn-primary');
+                }
+            }
+        }
+
+        // Initialize shift pill visuals on load based on pre-filled 'active' class
+        for (var i = 0; i < shiftPills.length; i++) {
+            if (shiftPills[i].classList.contains('active')) {
+                shiftPills[i].classList.remove('btn-outline-primary');
+                shiftPills[i].classList.add('btn-primary');
+            }
+
+            shiftPills[i].addEventListener('click', function () {
+                var shiftCode = this.dataset.shift;
+                var willBeActive = !this.classList.contains('active');
+                toggleShiftPill(shiftCode, willBeActive);
+
+                var activePillElements = document.querySelectorAll('.shift-pill.active');
+                var activeShifts = [];
+                for (var j = 0; j < activePillElements.length; j++) {
+                    activeShifts.push(activePillElements[j].dataset.shift);
+                }
+                shiftHidden.value = activeShifts.join(', ');
+                calculateTotalDowntime({ force: true });
+            });
+        }
+
+        function updateShiftsFromTimeRange() {
+            var start = new Date(startTimeInput.value);
+            var end = new Date(endTimeInput.value);
+            if (isNaN(start.getTime()) || isNaN(end.getTime())) return;
+            if (start >= end) return;
+
+            var shiftsToSelect = { 'A': false, 'B': false, 'C': false };
+            var current = new Date(start.getTime());
+
+            while (current < end) {
+                var hr = current.getHours();
+                if (hr >= 6 && hr < 14) shiftsToSelect['A'] = true;
+                else if (hr >= 14 && hr < 22) shiftsToSelect['B'] = true;
+                else shiftsToSelect['C'] = true;
+                current.setMinutes(current.getMinutes() + 30);
+            }
+
+            var endHr = new Date(end.getTime() - 1000).getHours();
+            if (endHr >= 6 && endHr < 14) shiftsToSelect['A'] = true;
+            else if (endHr >= 14 && endHr < 22) shiftsToSelect['B'] = true;
+            else shiftsToSelect['C'] = true;
+
+            ['A', 'B', 'C'].forEach(function (s) {
+                toggleShiftPill(s, shiftsToSelect[s]);
+            });
+
+            var activePillElements = document.querySelectorAll('.shift-pill.active');
+            var activeShifts = [];
+            for (var j = 0; j < activePillElements.length; j++) {
+                activeShifts.push(activePillElements[j].dataset.shift);
+            }
+            shiftHidden.value = activeShifts.join(', ');
+            calculateTotalDowntime({ force: true });
+        }
+
+        // Initialize visibility
+        if (document.querySelectorAll('.downtime-row').length > 0) {
+            var dtRows = document.querySelectorAll('.downtime-reason');
+            var hasData = false;
+            for (var k = 0; k < dtRows.length; k++) {
+                if (dtRows[k].value !== "") {
+                    hasData = true;
+                    break;
+                }
+            }
+            if (hasData) downtimeSection.style.display = 'block';
+        }
+
+        function resetSelect(selectEl, placeholder) {
+            if (!selectEl) return;
+            selectEl.innerHTML = '';
+            selectEl.add(new Option(placeholder || 'Select', ''));
+        }
+
+        function fetchJson(url) {
+            return fetch(url).then(function (r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.json();
+            });
+        }
+
+        function loadMachinesForShed(shedId, selectedMachineId) {
+            if (!machineSelect) return Promise.resolve();
+            if (!shedId) {
+                resetSelect(machineSelect, 'Select Shed First');
+                return Promise.resolve();
+            }
+            return fetchJson('/master/api/machines?status=Active&shed_id=' + encodeURIComponent(shedId)).then(function (rows) {
+                resetSelect(machineSelect, 'Select Machine');
+                (rows || []).forEach(function (m) {
+                    var opt = new Option(m.name, m.id);
+                    if (selectedMachineId && String(selectedMachineId) === String(m.id)) opt.selected = true;
+                    machineSelect.add(opt);
+                });
+            }).catch(function () {
+                resetSelect(machineSelect, 'Failed to load machines');
+            });
+        }
+
+        function safeNum(v) {
+            var n = parseFloat(v);
+            return isNaN(n) ? 0 : n;
+        }
+
+        function updateSelfRejectionRemoveButtons() {
+            if (!selfRejectionContainer) return;
+            var rows = selfRejectionContainer.querySelectorAll('.self-rejection-row');
+            rows.forEach(function (row) {
+                var btn = row.querySelector('.remove-self-rejection-row');
+                if (btn) btn.style.display = rows.length > 1 ? '' : 'none';
+            });
+        }
+
+        function recalculateSelfRejectionSummary() {
+            var totalQty = 0;
+            if (selfRejectionContainer) {
+                selfRejectionContainer.querySelectorAll('.self-rejection-qty').forEach(function (input) {
+                    totalQty += safeNum(input.value);
+                });
+            }
+            var machiningScrapKg = safeNum(machiningScrapKgInput && machiningScrapKgInput.value);
+            var weightPerPc = safeNum(selfRejectionWeightInput && selfRejectionWeightInput.value);
+            if (selfRejectionQtyInput) selfRejectionQtyInput.value = totalQty;
+            if (selfRejectionTotalPcs) selfRejectionTotalPcs.value = totalQty;
+            var totalSelfRejectionKg = weightPerPc * totalQty;
+            if (selfRejectionTotalKgInput) selfRejectionTotalKgInput.value = totalSelfRejectionKg.toFixed(3);
+            if (selfRejectionTotalAllKgInput) selfRejectionTotalAllKgInput.value = (totalSelfRejectionKg + machiningScrapKg).toFixed(3);
+            updateSelfRejectionRemoveButtons();
+        }
+
+        function loadAllOperations() {
+            if (!operationSelect) return Promise.resolve();
+            return fetchJson('/master/api/operations').then(function (rows) {
+                resetSelect(operationSelect, 'Select Operation');
+                (rows || []).forEach(function (op) {
+                    var o = new Option(op.operation_name, op.id);
+                    if (op.cycle_time_seconds !== undefined && op.cycle_time_seconds !== null) {
+                        o.dataset.seconds = op.cycle_time_seconds;
+                    }
+                    operationSelect.add(o);
+                });
+            });
+        }
+
+        function loadOperationsByCombo() {
+            if (!machineSelect || !customerSelect || !sectionSelect || !cutLengthSelect || !operationSelect) return Promise.resolve();
+            var machineId = machineSelect.value;
+            var customerId = customerSelect.value;
+            var sectionId = sectionSelect.value;
+            var cutLengthId = cutLengthSelect.value;
+            if (!machineId || !customerId || !sectionId || !cutLengthId) {
+                resetSelect(operationSelect, 'Select section + cut length first');
+                return Promise.resolve();
+            }
+            var url = '/master/api/operations/by-combo?machine_id=' + encodeURIComponent(machineId) +
+                '&customer_id=' + encodeURIComponent(customerId) +
+                '&section_id=' + encodeURIComponent(sectionId) +
+                '&cut_length_id=' + encodeURIComponent(cutLengthId);
+            return fetchJson(url).then(function (rows) {
+                if (!rows || rows.length === 0) return loadAllOperations();
+                resetSelect(operationSelect, 'Select Operation');
+                (rows || []).forEach(function (op) {
+                    var o = new Option(op.operation_name, op.id || op.operation_type_id);
+                    if (op.seconds !== undefined && op.seconds !== null) o.dataset.seconds = op.seconds;
+                    if (op.cycle_time_seconds !== undefined && op.cycle_time_seconds !== null) o.dataset.seconds = op.cycle_time_seconds;
+                    operationSelect.add(o);
+                });
+            }).catch(function () {
+                return loadAllOperations();
+            }).then(function () {
+                var currentOp = operationSelect.dataset.currentOperation;
+                if (currentOp) {
+                    operationSelect.value = String(currentOp);
+                    operationSelect.dataset.currentOperation = '';
+                }
+                if (window.jQuery && $(operationSelect).data('select2')) {
+                    $(operationSelect).trigger('change');
+                } else {
+                    operationSelect.dispatchEvent(new Event('change'));
+                }
+            });
+        }
+
+        function loadCutLengthsForSection(sectionId) {
+            if (!cutLengthSelect) return Promise.resolve();
+            if (!sectionId) {
+                resetSelect(cutLengthSelect, 'Select section first');
+                if (cutLengthHiddenInput) cutLengthHiddenInput.value = '';
+                return Promise.resolve();
+            }
+            return fetchJson('/master/api/cut-lengths/' + encodeURIComponent(sectionId)).then(function (rows) {
+                resetSelect(cutLengthSelect, 'Select Cut Length');
+                (rows || []).forEach(function (r) {
+                    cutLengthSelect.add(new Option((r.length + ' mm'), r.id));
+                });
+                var found = null;
+                var preferredCutId = String(cutLengthSelect.dataset.currentCutlengthId || '').trim();
+                if (preferredCutId) {
+                    found = Array.from(cutLengthSelect.options).find(function (opt) {
+                        return opt.value === preferredCutId;
+                    });
+                }
+                if (!found) {
+                    var currentCut = String(cutLengthSelect.dataset.currentCutlength || '').trim();
+                    if (currentCut) {
+                        found = Array.from(cutLengthSelect.options).find(function (opt) {
+                            return opt.text.replace(' mm', '').trim() === currentCut || opt.value === currentCut;
+                        });
+                    }
+                }
+                if (found) {
+                    cutLengthSelect.value = found.value;
+                }
+                cutLengthSelect.dataset.currentCutlength = '';
+                cutLengthSelect.dataset.currentCutlengthId = '';
+                if (cutLengthHiddenInput) {
+                    var txt = cutLengthSelect.value && cutLengthSelect.selectedIndex >= 0
+                        ? cutLengthSelect.options[cutLengthSelect.selectedIndex].text.replace(' mm', '')
+                        : '';
+                    cutLengthHiddenInput.value = txt;
+                }
+                return loadOperationsByCombo();
+            }).catch(function () {
+                resetSelect(cutLengthSelect, 'Failed to load cut lengths');
+            });
+        }
+
+        function loadSectionsForCustomer(customerId) {
+            if (!sectionSelect) return Promise.resolve();
+            if (!customerId) {
+                resetSelect(sectionSelect, 'Select customer first');
+                if (sectionHiddenInput) sectionHiddenInput.value = '';
+                return Promise.resolve();
+            }
+            return fetchJson('/master/api/sections/' + encodeURIComponent(customerId)).then(function (rows) {
+                resetSelect(sectionSelect, 'Select Section');
+                (rows || []).forEach(function (r) {
+                    sectionSelect.add(new Option(r.number, r.id));
+                });
+                var found = null;
+                var preferredSectionId = String(sectionSelect.dataset.currentSectionId || '').trim();
+                if (preferredSectionId) {
+                    found = Array.from(sectionSelect.options).find(function (opt) {
+                        return opt.value === preferredSectionId;
+                    });
+                }
+                if (!found) {
+                    var currentSection = String(sectionSelect.dataset.currentSection || '').trim();
+                    if (currentSection) {
+                        found = Array.from(sectionSelect.options).find(function (opt) {
+                            return opt.text.trim() === currentSection || opt.value === currentSection;
+                        });
+                    }
+                }
+                if (found) {
+                    sectionSelect.value = found.value;
+                }
+                sectionSelect.dataset.currentSection = '';
+                sectionSelect.dataset.currentSectionId = '';
+                if (sectionHiddenInput) {
+                    sectionHiddenInput.value = sectionSelect.value && sectionSelect.selectedIndex >= 0
+                        ? sectionSelect.options[sectionSelect.selectedIndex].text
+                        : '';
+                }
+                return loadCutLengthsForSection(sectionSelect.value);
+            }).catch(function () {
+                resetSelect(sectionSelect, 'Failed to load sections');
+            });
+        }
+
+        if (shedSelect) {
+            shedSelect.addEventListener('change', function () {
+                loadMachinesForShed(shedSelect.value, '').then(function () {
+                    loadOperationsByCombo();
+                });
+            });
+        }
+        if (customerSelect) {
+            customerSelect.addEventListener('change', function () {
+                loadSectionsForCustomer(customerSelect.value);
+            });
+        }
+        if (sectionSelect) {
+            sectionSelect.addEventListener('change', function () {
+                if (sectionHiddenInput) {
+                    sectionHiddenInput.value = sectionSelect.value && sectionSelect.selectedIndex >= 0
+                        ? sectionSelect.options[sectionSelect.selectedIndex].text
+                        : '';
+                }
+                loadCutLengthsForSection(sectionSelect.value);
+            });
+        }
+        if (cutLengthSelect) {
+            cutLengthSelect.addEventListener('change', function () {
+                if (cutLengthHiddenInput) {
+                    cutLengthHiddenInput.value = cutLengthSelect.value && cutLengthSelect.selectedIndex >= 0
+                        ? cutLengthSelect.options[cutLengthSelect.selectedIndex].text.replace(' mm', '')
+                        : '';
+                }
+                loadOperationsByCombo();
+            });
+        }
+        if (machineSelect) {
+            machineSelect.addEventListener('change', function () {
+                loadOperationsByCombo();
+            });
+        }
+
+        if (shedSelect && shedSelect.value) {
+            loadMachinesForShed(shedSelect.value, shedSelect.dataset.currentMachineId || '');
+        } else {
+            resetSelect(machineSelect, 'Select Shed First');
+        }
+
+        if (customerSelect && customerSelect.value) {
+            loadSectionsForCustomer(customerSelect.value).finally(function () {
+                initializingCombo = false;
+            });
+        } else {
+            resetSelect(sectionSelect, 'Select customer first');
+            resetSelect(cutLengthSelect, 'Select section first');
+            resetSelect(operationSelect, 'Select section + cut length first');
+            initializingCombo = false;
+        }
+
+        // --- OPERATOR LOGIC ---
+        function setupOperatorRow(row) {
+            var codeInput = row.querySelector('.operator-code');
+            var nameDisplay = row.querySelector('.operator-name-display');
+            var idHidden = row.querySelector('.operator-id-hidden');
+            var removeBtn = row.querySelector('.remove-operator');
+            if (codeInput) codeInput.required = true;
+            var opStart = row.querySelector('.op-start-time');
+            var opEnd = row.querySelector('.op-end-time');
+            if (opStart) opStart.required = true;
+            if (opEnd) opEnd.required = true;
+
+            codeInput.addEventListener('blur', function () {
+                var val = this.value.trim();
+                if (!val) return;
+                nameDisplay.value = 'Searching...';
+
+                $.ajax({
+                    url: '/master/api/employees?emp_code=' + val,
+                    method: 'GET',
+                    success: function (data) {
+                        if (data.id) {
+                            nameDisplay.value = data.name;
+                            idHidden.value = data.id;
+                            nameDisplay.classList.remove('is-invalid');
+                        } else {
+                            nameDisplay.value = 'Not found';
+                            idHidden.value = '';
+                            nameDisplay.classList.add('is-invalid');
+                        }
+                    },
+                    error: function () {
+                        nameDisplay.value = 'Not found';
+                        idHidden.value = '';
+                        nameDisplay.classList.add('is-invalid');
+                    }
+                });
+            });
+
+            if (removeBtn) {
+                removeBtn.addEventListener('click', function () {
+                    if (document.querySelectorAll('.operator-row').length > 1) row.remove();
+                });
+            }
+        }
+
+        addOperatorBtn.addEventListener('click', function () {
+            var template = document.getElementById('operator_template').firstElementChild;
+            var newRow = template.cloneNode(true);
+            newRow.querySelector('.op-start-time').value = startTimeInput.value;
+            newRow.querySelector('.op-end-time').value = endTimeInput.value;
+            operatorsContainer.appendChild(newRow);
+            setupOperatorRow(newRow);
+        });
+
+        var opRows = document.querySelectorAll('.operator-row');
+        for (var l = 0; l < opRows.length; l++) {
+            setupOperatorRow(opRows[l]);
+        }
+
+        // --- SUPERVISOR LOGIC ---
+        function setupSupervisorRow(row) {
+            var codeInput = row.querySelector('.supervisor-code');
+            var nameDisplay = row.querySelector('.supervisor-name-display');
+            var idHidden = row.querySelector('.supervisor-id-hidden');
+            var removeBtn = row.querySelector('.remove-supervisor');
+            if (codeInput) codeInput.required = true;
+            var supStart = row.querySelector('.sup-start-time');
+            var supEnd = row.querySelector('.sup-end-time');
+            if (supStart) supStart.required = true;
+            if (supEnd) supEnd.required = true;
+
+            codeInput.addEventListener('blur', function () {
+                var val = this.value.trim();
+                if (!val) return;
+                nameDisplay.value = 'Searching...';
+
+                $.ajax({
+                    url: '/master/api/employees?emp_code=' + val,
+                    method: 'GET',
+                    success: function (data) {
+                        if (data.id) {
+                            nameDisplay.value = data.name;
+                            idHidden.value = data.id;
+                            nameDisplay.classList.remove('is-invalid');
+                        } else {
+                            nameDisplay.value = 'Not found';
+                            idHidden.value = '';
+                            nameDisplay.classList.add('is-invalid');
+                        }
+                    },
+                    error: function () {
+                        nameDisplay.value = 'Not found';
+                        idHidden.value = '';
+                        nameDisplay.classList.add('is-invalid');
+                    }
+                });
+            });
+
+            if (removeBtn) {
+                removeBtn.addEventListener('click', function () {
+                    if (document.querySelectorAll('.supervisor-row').length > 1) row.remove();
+                });
+            }
+        }
+
+        addSupervisorBtn.addEventListener('click', function () {
+            var template = document.getElementById('supervisor_template').firstElementChild;
+            var newRow = template.cloneNode(true);
+            newRow.querySelector('.sup-start-time').value = startTimeInput.value;
+            newRow.querySelector('.sup-end-time').value = endTimeInput.value;
+            supervisorsContainer.appendChild(newRow);
+            setupSupervisorRow(newRow);
+        });
+
+        var supRows = document.querySelectorAll('.supervisor-row');
+        for (var m = 0; m < supRows.length; m++) {
+            setupSupervisorRow(supRows[m]);
+        }
+
+        // --- DOWNTIME LOGIC ---
+        function loadDowntimeReasons() {
+            $.ajax({
+                url: '/master/api/downtime-reasons',
+                method: 'GET',
+                success: function (data) {
+                    downtimeReasons = data;
+                    updateDowntimeDropdowns();
+                },
+                error: function (e) { console.error("Error loading downtime reasons:", e); }
+            });
+        }
+
+        function updateDowntimeDropdowns() {
+            var selects = document.querySelectorAll('.downtime-reason');
+            for (var n = 0; n < selects.length; n++) {
+                var select = selects[n];
+                if (select.options.length > 1) continue;
+                for (var o = 0; o < downtimeReasons.length; o++) {
+                    var r = downtimeReasons[o];
+                    var opt = document.createElement('option');
+                    opt.value = r.id;
+                    opt.textContent = r.reason_name;
+                    select.appendChild(opt);
+                }
+            }
+        }
+
+        toggleDowntimeBtn.addEventListener('click', function () {
+            downtimeSection.style.display = downtimeSection.style.display === 'none' ? 'block' : 'none';
+            if (downtimeSection.style.display === 'block' && downtimeReasons.length === 0) {
+                loadDowntimeReasons();
+            }
+        });
+
+        addMoreDowntime.addEventListener('click', function () {
+            var template = document.getElementById('downtime_template').firstElementChild;
+            var newRow = template.cloneNode(true);
+            downtimeContainer.appendChild(newRow);
+            updateDowntimeDropdowns(); // Fill the new dropdown
+
+            newRow.querySelector('.remove-downtime').addEventListener('click', function () {
+                this.closest('.downtime-row').remove();
+                calculateTotalDowntime({ force: true });
+            });
+        });
+
+        var removeDtBtns = document.querySelectorAll('.remove-downtime');
+        for (var p = 0; p < removeDtBtns.length; p++) {
+            removeDtBtns[p].addEventListener('click', function () {
+                if (document.querySelectorAll('.downtime-row').length > 1) {
+                    this.closest('.downtime-row').remove();
+                } else {
+                    this.closest('.downtime-row').querySelector('.downtime-reason').value = '';
+                    this.closest('.downtime-row').querySelector('.downtime-duration').value = '';
+                }
+                calculateTotalDowntime({ force: true });
+            });
+        }
+
+        // Shift durations in minutes
+        var SHIFT_MINUTES_EDIT = { 'A': 480, 'B': 480, 'C': 480 };
+
+        function getTotalShiftMinutes() {
+            var shifts = shiftHidden.value.split(',').map(function (s) { return s.trim(); }).filter(function (s) { return s; });
+            var total = 0;
+            for (var q = 0; q < shifts.length; q++) {
+                total += (SHIFT_MINUTES_EDIT[shifts[q]] || 0);
+            }
+            // Fallback to datetime difference when shift tags are empty/invalid.
+            if (total <= 0 && startTimeInput && endTimeInput && startTimeInput.value && endTimeInput.value) {
+                var st = new Date(startTimeInput.value);
+                var et = new Date(endTimeInput.value);
+                if (!isNaN(st.getTime()) && !isNaN(et.getTime()) && et > st) {
+                    total = Math.round((et - st) / 60000);
+                }
+            }
+            return total;
+        }
+
+        function calculateTotalDowntime(options) {
+            options = options || {};
+            var total = 0;
+            var dtRows = document.querySelectorAll('.downtime-row');
+            for (var r = 0; r < dtRows.length; r++) {
+                var row = dtRows[r];
+                var durationInput = row.querySelector('.downtime-duration');
+                total += (parseInt(durationInput && durationInput.value, 10) || 0);
+            }
+            if (totalDtDisplay) totalDtDisplay.textContent = total;
+            if (totalDtHidden) totalDtHidden.value = total;
+            calculateAvailableRuntime();
+        }
+
+        function calculateAvailableRuntime() {
+            var totalShiftMins = getTotalShiftMinutes();
+            document.getElementById('total_shift_minutes').value = totalShiftMins;
+
+            var totalPlannedDt = parseInt(totalDtHidden.value) || 0;
+            var breakdown = 0;
+            var totalDowntime = totalPlannedDt + breakdown;
+            document.getElementById('total_downtime_edit').value = totalDowntime;
+
+            var availableMins = totalShiftMins - totalDowntime;
+            totalRuntimeInput.value = availableMins > 0 ? availableMins : 0;
+
+            calculateUnaccountedTime();
+        }
+
+        function calculateUnaccountedTime() {
+            var totalRuntimeInput = document.getElementById('total_time_taken_minutes');
+            var available = parseFloat(totalRuntimeInput.value) || 0;
+            var totalIdealInput = document.getElementById('total_ideal_time_minutes');
+            var idealTimeInputVal = totalIdealInput.value || 0;
+            var idealTime = parseFloat(idealTimeInputVal);
+            var unaccountedField = document.getElementById('total_unaccounted_time');
+            if (unaccountedField) {
+                unaccountedField.value = (available - idealTime).toFixed(1);
+            }
+        }
+
+        function validateEditForm() {
+            if (!machineSelect || !machineSelect.value) {
+                alert('Please select a Machine before updating.');
+                machineSelect && machineSelect.focus();
+                return false;
+            }
+            if (!customerSelect || !customerSelect.value) {
+                alert('Please select a Customer before updating.');
+                customerSelect && customerSelect.focus();
+                return false;
+            }
+            if (!sectionHiddenInput || !String(sectionHiddenInput.value || '').trim()) {
+                alert('Please select a Section Number before updating.');
+                sectionSelect && sectionSelect.focus();
+                return false;
+            }
+            if (!cutLengthHiddenInput || !String(cutLengthHiddenInput.value || '').trim()) {
+                alert('Please select a Cut Length before updating.');
+                cutLengthSelect && cutLengthSelect.focus();
+                return false;
+            }
+            if (!operationSelect || !operationSelect.value) {
+                alert('Please select an Operation / Process before updating.');
+                operationSelect && operationSelect.focus();
+                return false;
+            }
+            recalculateSelfRejectionSummary();
+            var selfRows = selfRejectionContainer ? Array.from(selfRejectionContainer.querySelectorAll('.self-rejection-row')) : [];
+            var validSelfRows = selfRows.filter(function (row) {
+                return !!(row.querySelector('.self-rejection-defect') && row.querySelector('.self-rejection-defect').value) &&
+                    safeNum(row.querySelector('.self-rejection-qty') && row.querySelector('.self-rejection-qty').value) > 0;
+            });
+            if (safeNum(machiningScrapKgInput && machiningScrapKgInput.value) <= 0) {
+                alert('Enter Total Machining Scrap (kg) before updating.');
+                if (machiningScrapKgInput) machiningScrapKgInput.focus();
+                return false;
+            }
+            if (validSelfRows.length > 0 && safeNum(selfRejectionWeightInput && selfRejectionWeightInput.value) <= 0) {
+                alert('Check Total Machining Scrap (kg) and Total Self Rejection PCS. Weight/PCS for self rejection is auto-calculated from those values.');
+                if (selfRejectionWeightInput) selfRejectionWeightInput.focus();
+                return false;
+            }
+            return true;
+        }
+
+        if (addSelfRejectionRowBtn && selfRejectionContainer && selfRejectionRowTemplate) {
+            addSelfRejectionRowBtn.addEventListener('click', function () {
+                var row = selfRejectionRowTemplate.content
+                    ? selfRejectionRowTemplate.content.querySelector('.self-rejection-row')
+                    : selfRejectionRowTemplate.querySelector('.self-rejection-row');
+                if (!row) return;
+                var clone = row.cloneNode(true);
+                var defect = clone.querySelector('.self-rejection-defect');
+                var qty = clone.querySelector('.self-rejection-qty');
+                if (defect) defect.value = '';
+                if (qty) qty.value = '0';
+                selfRejectionContainer.appendChild(clone);
+                recalculateSelfRejectionSummary();
+            });
+        }
+
+        if (selfRejectionContainer) {
+            selfRejectionContainer.addEventListener('click', function (e) {
+                var btn = e.target.closest('.remove-self-rejection-row');
+                if (!btn) return;
+                var row = btn.closest('.self-rejection-row');
+                if (!row) return;
+                var rows = selfRejectionContainer.querySelectorAll('.self-rejection-row');
+                if (rows.length <= 1) return;
+                row.remove();
+                recalculateSelfRejectionSummary();
+            });
+            selfRejectionContainer.addEventListener('input', function (e) {
+                if (e.target.classList.contains('self-rejection-qty')) {
+                    recalculateSelfRejectionSummary();
+                }
+            });
+            selfRejectionContainer.addEventListener('change', function (e) {
+                if (e.target.classList.contains('self-rejection-defect')) {
+                    recalculateSelfRejectionSummary();
+                }
+            });
+        }
+        if (machiningScrapKgInput) {
+            machiningScrapKgInput.addEventListener('input', recalculateSelfRejectionSummary);
+            machiningScrapKgInput.addEventListener('change', recalculateSelfRejectionSummary);
+        }
+        if (selfRejectionWeightInput) {
+            selfRejectionWeightInput.addEventListener('input', recalculateSelfRejectionSummary);
+            selfRejectionWeightInput.addEventListener('change', recalculateSelfRejectionSummary);
+        }
+
+        document.addEventListener('input', function (e) {
+            if (e.target.classList.contains('downtime-duration')) {
+                calculateTotalDowntime({ force: true });
+            }
+        });
+
+        startTimeInput.addEventListener('change', function () {
+            updateAllOperatorTimes();
+            updateAllSupervisorTimes();
+            updateShiftsFromTimeRange();
+        });
+        endTimeInput.addEventListener('change', function () {
+            updateAllOperatorTimes();
+            updateAllSupervisorTimes();
+            updateShiftsFromTimeRange();
+        });
+
+        function updateShiftsFromTimeRange() {
+            var start = new Date(startTimeInput.value);
+            var end = new Date(endTimeInput.value);
+            if (isNaN(start.getTime()) || isNaN(end.getTime())) return;
+            if (start >= end) return;
+
+            var shiftsToSelect = { 'A': false, 'B': false, 'C': false };
+            var current = new Date(start.getTime());
+
+            while (current < end) {
+                var hr = current.getHours();
+                if (hr >= 6 && hr < 14) shiftsToSelect['A'] = true;
+                else if (hr >= 14 && hr < 22) shiftsToSelect['B'] = true;
+                else shiftsToSelect['C'] = true;
+                current.setMinutes(current.getMinutes() + 30);
+            }
+            var endHr = new Date(end.getTime() - 1000).getHours();
+            if (endHr >= 6 && endHr < 14) shiftsToSelect['A'] = true;
+            else if (endHr >= 14 && endHr < 22) shiftsToSelect['B'] = true;
+            else shiftsToSelect['C'] = true;
+
+            ['A', 'B', 'C'].forEach(function (s) {
+                var pill = document.querySelector('.shift-pill[data-shift="' + s + '"]');
+                if (!pill) return;
+                var shouldBeActive = shiftsToSelect[s];
+                var currentlyActive = pill.classList.contains('active');
+
+                if (currentlyActive !== shouldBeActive) {
+                    pill.classList.toggle('active', shouldBeActive);
+                    if (shouldBeActive) {
+                        pill.classList.remove('btn-outline-primary');
+                        pill.classList.add('btn-primary');
+                    } else {
+                        pill.classList.add('btn-outline-primary');
+                        pill.classList.remove('btn-primary');
+                    }
+                }
+            });
+            updateShiftHidden();
+            calculateTotalDowntime({ force: true });
+        }
+
+        function updateShiftHidden() {
+            var activeShifts = [];
+            for (var i = 0; i < shiftPills.length; i++) {
+                if (shiftPills[i].classList.contains('active')) {
+                    activeShifts.push(shiftPills[i].dataset.shift);
+                }
+            }
+            shiftHidden.value = activeShifts.join(',');
+        }
+
+        function updateAllOperatorTimes() {
+            var startTimes = document.querySelectorAll('.op-start-time');
+            var endTimes = document.querySelectorAll('.op-end-time');
+            for (var i = 0; i < startTimes.length; i++) {
+                if (!startTimes[i].value) startTimes[i].value = startTimeInput.value;
+                if (!endTimes[i].value) endTimes[i].value = endTimeInput.value;
+            }
+        }
+
+        function updateAllSupervisorTimes() {
+            var startTimes = document.querySelectorAll('.sup-start-time');
+            var endTimes = document.querySelectorAll('.sup-end-time');
+            for (var i = 0; i < startTimes.length; i++) {
+                if (!startTimes[i].value) startTimes[i].value = startTimeInput.value;
+                if (!endTimes[i].value) endTimes[i].value = endTimeInput.value;
+            }
+        }
+        updateShiftsFromTimeRange();
+        recalculateSelfRejectionSummary();
+    })();
+
+    // --- SUBMISSION LOGIC ---
+    prodForm.addEventListener('submit', function (e) {
+        var self = this;
+        if (!validateEditForm()) {
+            e.preventDefault();
+            return;
+        }
+
+        // Validate personnel time rows: each row must have Start < End (server validates too).
+        function validateRowTimes(rows, startSelector, endSelector, label) {
+            for (var i = 0; i < rows.length; i++) {
+                var row = rows[i];
+                var sEl = row.querySelector(startSelector);
+                var eEl = row.querySelector(endSelector);
+                if (!sEl || !eEl) continue;
+                if (!sEl.value || !eEl.value) continue;
+                var s = new Date(sEl.value);
+                var e2 = new Date(eEl.value);
+                if (s.getTime() >= e2.getTime()) {
+                    alert(label + ' row #' + (i + 1) + ': Start Time must be earlier than End Time.');
+                    eEl.focus();
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        var opRows = Array.from(document.querySelectorAll('.operator-row'));
+        if (!validateRowTimes(opRows, '.op-start-time', '.op-end-time', 'Operator')) {
+            e.preventDefault();
+            return;
+        }
+        var supRows = Array.from(document.querySelectorAll('.supervisor-row'));
+        if (!validateRowTimes(supRows, '.sup-start-time', '.sup-end-time', 'Supervisor')) {
+            e.preventDefault();
+            return;
+        }
+
+        var availableMins = parseFloat(document.getElementById('total_time_taken_minutes').value) || 0;
+        var idealMins = parseFloat(document.getElementById('total_ideal_time_minutes').value) || 0;
+        if (idealMins > availableMins) {
+            e.preventDefault();
+            alert('Total Ideal Time (Mins) cannot be more than Total Available Machine Hours. Please review both fields.');
+            document.getElementById('total_ideal_time_minutes').focus();
+            return;
+        }
+
+        // If we've already done the overlap check, let it proceed
+        if (this.dataset.overlapChecked === 'true') {
+            return;
+        }
+
+        e.preventDefault(); // Stop and do check
+
+        var machineId = document.getElementById('machine_id').value;
+        var startTime = document.getElementById('start_time').value;
+        var endTime = document.getElementById('end_time').value;
+
+        // Call AJAX to check overlap
+        $.ajax({
+            url: '/api/production-entries/check-overlap',
+            method: 'GET',
+            data: {
+                machine_id: machineId,
+                start_time: startTime,
+                end_time: endTime,
+                exclude_id: "{{ entry.id }}"
+            },
+            success: function (data) {
+                if (data.overlap) {
+                    var conflict = data.conflict_details;
+                    var html = '<div class="card border-danger mb-0"><div class="card-body">';
+                    html += '<div class="row g-3">';
+                    html += '<div class="col-6"><p class="mb-1 text-muted small">Machine</p><p class="fw-bold mb-0">' + conflict.machine_name + '</p></div>';
+                    html += '<div class="col-6"><p class="mb-1 text-muted small">Customer</p><p class="fw-bold mb-0">' + conflict.customer_name + '</p></div>';
+                    html += '<div class="col-12"><p class="mb-1 text-muted small">Time Range</p><p class="fw-bold text-danger mb-0">' + conflict.start_time + ' TO ' + conflict.end_time + '</p></div>';
+                    html += '<div class="col-4"><p class="mb-1 text-muted small">Section</p><p class="fw-bold mb-0">' + (conflict.section || '-') + '</p></div>';
+                    html += '<div class="col-4"><p class="mb-1 text-muted small">Cut Length</p><p class="fw-bold mb-0">' + (conflict.cutlength || '-') + ' mm</p></div>';
+                    html += '<div class="col-4"><p class="mb-1 text-muted small">Produced Qty</p><p class="fw-bold mb-0">' + conflict.actual_qty + ' PCS</p></div>';
+                    html += '</div></div></div>';
+
+                    document.getElementById('conflictDetailsContainer').innerHTML = html;
+                    overlapModal.show();
+                } else {
+                    // Check downtime next
+                    var dtRows = document.querySelectorAll('.downtime-reason');
+                    var hasDowntime = false;
+                    for (var s = 0; s < dtRows.length; s++) {
+                        if (dtRows[s].value !== "") {
+                            hasDowntime = true;
+                            break;
+                        }
+                    }
+
+                    if (!hasDowntime && !self.querySelector('input[name="force_submit"]')) {
+                        if (confirmModal) {
+                            confirmModal.show();
+                        } else if (confirm('No planned downtime selected. Update anyway?')) {
+                            self.dataset.overlapChecked = 'true';
+                            self.submit();
+                        }
+                    } else {
+                        self.dataset.overlapChecked = 'true';
+                        self.submit();
+                    }
+                }
+            },
+            error: function () {
+                // Fallback to normal submission if API fails
+                self.dataset.overlapChecked = 'true';
+                self.submit();
+            }
+        });
+    });
+
+    if (forceSubmitBtn) {
+        forceSubmitBtn.addEventListener('click', function () {
+            var hiddenSubmit = document.createElement('input');
+            hiddenSubmit.type = 'hidden';
+            hiddenSubmit.name = 'force_submit';
+            hiddenSubmit.value = 'true';
+            prodForm.appendChild(hiddenSubmit);
+            prodForm.dataset.overlapChecked = 'true';
+            prodForm.submit();
+        });
+    }
+
+    // --- METRIC CALCULATION ---
+    function calculateMetrics() {
+        var planned = parseFloat(plannedQty.value) || 0;
+        var actual = parseFloat(actualQty.value) || 0;
+        var idealVal = idealTimeInput.value || 0;
+        var ideal = parseFloat(idealVal);
+
+        prodMiss.value = planned - actual;
+        // Now ideal is in minutes
+        totalIdealInput.value = (actual * ideal).toFixed(1);
+        calculateUnaccountedTime();
+    }
+
+    operationSelect.addEventListener('change', function () {
+        if (!this.value) {
+            idealTimeInput.value = '';
+            calculateMetrics();
+            return;
+        }
+        var selected = this.options[this.selectedIndex];
+        var seconds = selected.dataset ? selected.dataset.seconds : '';
+        if (seconds !== undefined && seconds !== null && String(seconds).trim() !== '') {
+            idealTimeInput.value = (parseFloat(seconds) / 60).toFixed(2);
+        } else {
+            // Keep already saved ideal cycle value on edit when option metadata is absent.
+            if (!idealTimeInput.value) idealTimeInput.value = '0';
+        }
+        calculateMetrics();
+    });
+
+    plannedQty.addEventListener('input', calculateMetrics);
+    actualQty.addEventListener('input', calculateMetrics);
+
+    // Initial trigger
+    setTimeout(function () {
+        calculateMetrics();
+        calculateTotalDowntime({ force: true });
+        calculateUnaccountedTime();
+    }, 500);
+</script>
+<script>
+    (function () {
+        function byId(id) { return document.getElementById(id); }
+        function toNum(v) {
+            var n = parseFloat(v);
+            return isNaN(n) ? 0 : n;
+        }
+
+        var shiftHidden = byId('shift_hidden');
+        var shiftPills = document.querySelectorAll('.shift-pill');
+        var startTime = byId('start_time');
+        var endTime = byId('end_time');
+        var totalShift = byId('total_shift_minutes');
+        var totalDt = byId('total_downtime_edit');
+        var totalDtHidden = byId('total_planned_dt_hidden');
+        var runtime = byId('total_time_taken_minutes');
+        var planned = byId('planned_quantity');
+        var actual = byId('actual_quantity');
+        var idealPerPc = byId('ideal_cycle_time');
+        var totalIdeal = byId('total_ideal_time_minutes');
+        var unaccounted = byId('total_unaccounted_time');
+        var prodMiss = byId('production_miss');
+        var operation = byId('operation_type_id');
+
+        if (!totalShift || !runtime || !totalIdeal || !unaccounted) return;
+
+        function syncShiftHiddenFromPills() {
+            if (!shiftHidden) return;
+            var shifts = [];
+            shiftPills.forEach(function (p) {
+                if (p.classList.contains('active') && p.dataset && p.dataset.shift) {
+                    shifts.push(p.dataset.shift);
+                }
+            });
+            if (shifts.length > 0) shiftHidden.value = shifts.join(', ');
+        }
+
+        function computeShiftMinutes() {
+            var mins = 0;
+            var shifts = (shiftHidden && shiftHidden.value ? shiftHidden.value : '')
+                .split(',')
+                .map(function (s) { return s.trim(); })
+                .filter(Boolean);
+            if (shifts.length > 0) mins = shifts.length * 480;
+            if (mins <= 0 && startTime && endTime && startTime.value && endTime.value) {
+                var st = new Date(startTime.value);
+                var et = new Date(endTime.value);
+                if (!isNaN(st.getTime()) && !isNaN(et.getTime()) && et > st) {
+                    mins = Math.round((et - st) / 60000);
+                }
+            }
+            return mins;
+        }
+
+        function computeIdealPerPcMinutes() {
+            var ideal = toNum(idealPerPc && idealPerPc.value);
+            if (ideal > 0) return ideal;
+
+            if (operation && operation.selectedIndex >= 0) {
+                var opt = operation.options[operation.selectedIndex];
+                var sec = toNum(opt && opt.dataset ? opt.dataset.seconds : 0);
+                if (sec > 0) return sec / 60;
+            }
+
+            var act = toNum(actual && actual.value);
+            var totalIdealVal = toNum(totalIdeal.value);
+            if (act > 0 && totalIdealVal > 0) return totalIdealVal / act;
+            return 0;
+        }
+
+        function recalcEditMetrics() {
+            syncShiftHiddenFromPills();
+
+            var shiftMins = computeShiftMinutes();
+            totalShift.value = shiftMins > 0 ? String(shiftMins) : '0';
+
+            var dt = toNum(totalDtHidden && totalDtHidden.value);
+            if (dt <= 0) dt = toNum(totalDt && totalDt.value);
+            if (totalDt) totalDt.value = String(dt);
+
+            var avail = Math.max(0, shiftMins - dt);
+            runtime.value = String(avail);
+
+            var act = toNum(actual && actual.value);
+            var plan = toNum(planned && planned.value);
+            if (prodMiss) prodMiss.value = String(plan - act);
+
+            var ideal = computeIdealPerPcMinutes();
+            if (idealPerPc && ideal > 0) idealPerPc.value = ideal.toFixed(2);
+
+            var totalIdealMins = act * ideal;
+            totalIdeal.value = totalIdealMins.toFixed(1);
+
+            unaccounted.value = (avail - totalIdealMins).toFixed(1);
+        }
+
+        if (shiftPills && shiftPills.length) {
+            shiftPills.forEach(function (p) {
+                p.addEventListener('click', function () { setTimeout(recalcEditMetrics, 0); });
+            });
+        }
+        if (startTime) startTime.addEventListener('change', recalcEditMetrics);
+        if (endTime) endTime.addEventListener('change', recalcEditMetrics);
+        if (planned) planned.addEventListener('input', recalcEditMetrics);
+        if (actual) actual.addEventListener('input', recalcEditMetrics);
+        if (operation) operation.addEventListener('change', recalcEditMetrics);
+        document.addEventListener('input', function (e) {
+            if (e.target && e.target.classList && e.target.classList.contains('downtime-duration')) {
+                recalcEditMetrics();
+            }
+        });
+
+        setTimeout(recalcEditMetrics, 50);
+        setTimeout(recalcEditMetrics, 500);
+    })();
+</script>
+{% endblock %}

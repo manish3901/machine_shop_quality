@@ -1,0 +1,219 @@
+[
+  {
+    "customer": "C2",
+    "section": "2122",
+    "machine": "796.5",
+    "cut_length": "Raidius cutting",
+    "cycle_time": "4 Mins"
+  },
+  {
+    "customer": "C2",
+    "section": "2123(U)",
+    "machine": "418.2",
+    "cut_length": "Side milling",
+    "cycle_time": "5 Mins"
+  },
+  {
+    "customer": "C2",
+    "section": "2123(L)",
+    "machine": "428.75",
+    "cut_length": "Side milling",
+    "cycle_time": "18 mins"
+  },
+  {
+    "customer": "C2",
+    "section": "2191",
+    "machine": "489.7",
+    "cut_length": "Slitting",
+    "cycle_time": "6 min"
+  },
+  {
+    "customer": "AGAM",
+    "section": "90129",
+    "machine": "2540",
+    "cut_length": "MILLING",
+    "cycle_time": "3.5 Mins"
+  },
+  {
+    "customer": "AGAM",
+    "section": "90129",
+    "machine": "2540",
+    "cut_length": "MILLING",
+    "cycle_time": "15 Mins"
+  },
+  {
+    "customer": "MEDIT",
+    "section": "SECTION",
+    "machine": "C / L (cut length) IN MM",
+    "cut_length": "1st Setup",
+    "cycle_time": "2nd Setup"
+  },
+  {
+    "customer": "MEDIT",
+    "section": "SECTION",
+    "machine": "C / L (cut length) IN MM",
+    "cut_length": "1st Setup",
+    "cycle_time": "2nd Setup"
+  },
+  {
+    "customer": "MEDIT",
+    "section": "1755",
+    "machine": "5000",
+    "cut_length": null,
+    "cycle_time": "14 X 90DEGREE DRILLING"
+  },
+  {
+    "customer": "MEDIT",
+    "section": "1755",
+    "machine": "3000",
+    "cut_length": null,
+    "cycle_time": "14 X 90DEGREE DRILLING"
+  },
+  {
+    "customer": "MEDIT",
+    "section": "1758",
+    "machine": "5000",
+    "cut_length": null,
+    "cycle_time": "6mm Drain holes"
+  },
+  {
+    "customer": "MEDIT",
+    "section": "1759",
+    "machine": "5000",
+    "cut_length": null,
+    "cycle_time": "14 X26 MM DRILLING"
+  },
+  {
+    "customer": "MEDIT",
+    "section": "1770",
+    "machine": "6100",
+    "cut_length": null,
+    "cycle_time": "14 X36 DRILLING"
+  },
+  {
+    "customer": "MEDIT",
+    "section": "99719",
+    "machine": "1107",
+    "cut_length": null,
+    "cycle_time": "8X18 MM DRILLING"
+  },
+  {
+    "customer": "MEDIT",
+    "section": "99719",
+    "machine": "5000",
+    "cut_length": null,
+    "cycle_time": "17MM PRE DRILL  &\n 18MM DRILLING"
+  },
+  {
+    "customer": "MEDIT",
+    "section": "1780",
+    "machine": "2500",
+    "cut_length": null,
+    "cycle_time": "14X28 DRILLING"
+  },
+  {
+    "customer": "MEDIT",
+    "section": "1792",
+    "machine": "5000",
+    "cut_length": null,
+    "cycle_time": "14 X33 DRILLING"
+  },
+  {
+    "customer": "MEDIT",
+    "section": "1792",
+    "machine": "6100",
+    "cut_length": "8MM DRILLING & 16MM SLOT",
+    "cycle_time": "14 X33 DRILLING"
+  },
+  {
+    "customer": "MEDIT",
+    "section": "1792",
+    "machine": "6100",
+    "cut_length": "8MM DRILLING & 16MM SLOT",
+    "cycle_time": "14 X33 DRILLING"
+  },
+  {
+    "customer": "MEDIT",
+    "section": "1800",
+    "machine": "5000",
+    "cut_length": null,
+    "cycle_time": "14 X33 DRILLING"
+  },
+  {
+    "customer": "MEDIT",
+    "section": "2430",
+    "machine": "5000",
+    "cut_length": null,
+    "cycle_time": "14 X33 DRILLING"
+  },
+  {
+    "customer": "MEDIT",
+    "section": "2439",
+    "machine": "5000",
+    "cut_length": "8MM DRILLING & 16MM SLOT",
+    "cycle_time": "14 X33 DRILLING"
+  },
+  {
+    "customer": "MEDIT",
+    "section": "2441",
+    "machine": "5000",
+    "cut_length": "8MM DRILLING",
+    "cycle_time": "14X28 MM DRILLING"
+  },
+  {
+    "customer": "MEDIT",
+    "section": "2444",
+    "machine": "2500",
+    "cut_length": null,
+    "cycle_time": "14 X33 DRILLING"
+  },
+  {
+    "customer": "MEDIT",
+    "section": "2444",
+    "machine": "5000",
+    "cut_length": null,
+    "cycle_time": "14 X33 DRILLING"
+  },
+  {
+    "customer": "MEDIT",
+    "section": "2464",
+    "machine": "3050",
+    "cut_length": null,
+    "cycle_time": "14 X33 DRILLING"
+  },
+  {
+    "customer": "MEDIT",
+    "section": "2464",
+    "machine": "5000",
+    "cut_length": null,
+    "cycle_time": "14 X33 DRILLING"
+  },
+  {
+    "customer": "MEDIT",
+    "section": "2465",
+    "machine": "3050",
+    "cut_length": null,
+    "cycle_time": "14 X33 DRILLING"
+  },
+  {
+    "customer": "MEDIT",
+    "section": "2465",
+    "machine": "5000",
+    "cut_length": null,
+    "cycle_time": "14 X33 DRILLING"
+  },
+  {
+    "customer": "MEDIT",
+    "section": "99721",
+    "machine": "5000",
+    "cut_length": "8MM DRILLING & 16MM SLOT",
+    "cycle_time": "14X21 DRILLING"
+  },
+  {
+    "customer": "MEDIT",
+    "section": "99643",
+    "machine": "5000",
+    "cut_length": "6MM DRILLING & 10MM SLOT",
+    "cycle_time": "10.5X20 MM DRILLING"
+  }
+]

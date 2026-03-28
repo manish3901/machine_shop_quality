@@ -1,0 +1,1174 @@
+{% extends "base.html" %}
+
+{% block title %}Rejection Records - Machine Shop{% endblock %}
+
+{% block page_title %}Rejection Records & Analytics{% endblock %}
+{% block page_subtitle %}View and analyze rejection data with filters{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 1rem;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .stat-card.green {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    }
+
+    .stat-card.orange {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    }
+
+    .stat-value {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 0.25rem;
+    }
+
+    .stat-label {
+        font-size: 0.875rem;
+        opacity: 0.9;
+    }
+
+    .chart-container {
+        position: relative;
+        height: 300px;
+        margin-bottom: 2rem;
+    }
+
+    .filter-section {
+        background: rgba(255, 255, 255, 0.5);
+        padding: 1.5rem;
+        border-radius: 1rem;
+        margin-bottom: 2rem;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .table-responsive {
+        border-radius: 1rem;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .table {
+        margin-bottom: 0;
+    }
+
+    .table thead {
+        background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+        color: white;
+    }
+
+    .table tbody tr:hover {
+        background-color: rgba(99, 102, 241, 0.05);
+    }
+
+    #rejectionRecordsTable {
+        min-width: 980px;
+    }
+
+    /* Mobile-first adjustments */
+    .table-responsive {
+        -webkit-overflow-scrolling: touch;
+    }
+
+    @media (max-width: 576px) {
+        .filter-section {
+            padding: 1rem;
+        }
+
+        .stat-card {
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+        }
+
+        .chart-container {
+            height: 240px;
+        }
+
+        .card-header {
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .card-header .btn {
+            width: 100%;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Filter Section -->
+<div class="filter-section">
+    <h5 class="mb-3"><i class="fas fa-filter me-2"></i>Filters</h5>
+    <form method="GET" action="{{ url_for('rejection.rejection_records') }}" id="filterForm">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label fw-semibold small">Start Date & Time</label>
+                <input type="datetime-local" name="start_date" class="form-control" value="{{ start_datetime_value }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold small">End Date & Time</label>
+                <input type="datetime-local" name="end_date" class="form-control" value="{{ end_datetime_value }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold small">Entry No</label>
+                <input type="text" name="entry_no" class="form-control" value="{{ request.args.get('entry_no', '') }}"
+                    placeholder="MS-2026-0001">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold small">Employee Code</label>
+                <input type="text" name="emp_code" class="form-control" value="{{ request.args.get('emp_code', '') }}"
+                    placeholder="E1234">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold small">Customer</label>
+                <select name="customer_id" class="form-select" id="customerFilter">
+                    <option value="">All Customers</option>
+                    {% for customer in customers %}
+                    <option value="{{ customer.id }}" {% if request.args.get('customer_id')==customer.id|string %}selected{% endif %}>
+                        {{ customer.customer_name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold small">Month</label>
+                <select name="month" class="form-select" id="monthFilter">
+                    <option value="">All Months</option>
+                    {% for month in months %}
+                    <option value="{{ month }}" {% if request.args.get('month')==month %}selected{% endif %}>
+                        {{ month }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold small">Section Number</label>
+                <select name="section_number" class="form-select" id="sectionFilter"
+                    data-selected="{{ request.args.get('section_number', request.args.get('section', '')) }}">
+                    <option value="">All Sections</option>
+                    {% for s in sections %}
+                    <option value="{{ s.section_number }}" {% if request.args.get('section_number', request.args.get('section', ''))==s.section_number %}selected{% endif %}>
+                        {{ s.section_number }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold small">Cut Length (mm)</label>
+                <select name="cut_length" class="form-select" id="cutLengthFilter"
+                    data-selected="{{ request.args.get('cut_length', request.args.get('length', '')) }}">
+                    <option value="">All Cut Lengths</option>
+                    {% for cl in cut_lengths %}
+                    <option value="{{ cl.cut_length }}" {% if request.args.get('cut_length', request.args.get('length', ''))==cl.cut_length|string %}selected{% endif %}>
+                        {{ cl.cut_length }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-semibold small">Process / Opn</label>
+                <select name="operation_type_id" class="form-select" id="operationFilter">
+                    <option value="">All Process</option>
+                    {% for op in operations %}
+                    <option value="{{ op.id }}" {% if request.args.get('operation_type_id')==op.id|string %}selected{% endif %}>
+                        {{ op.operation_name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-semibold small">Defect Type</label>
+                <select name="defect_type_id" class="form-select" id="defectTypeFilter">
+                    <option value="">All Defect Types</option>
+                    {% for d in defect_types %}
+                    <option value="{{ d.id }}" {% if request.args.get('defect_type_id')==d.id|string %}selected{% endif %}>
+                        {{ d.defect_name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-semibold small">Shift</label>
+                <select name="shift" class="form-select" id="shiftFilter">
+                    <option value="">All Shifts</option>
+                    <option value="A" {% if request.args.get('shift')=='A' %}selected{% endif %}>A</option>
+                    <option value="B" {% if request.args.get('shift')=='B' %}selected{% endif %}>B</option>
+                    <option value="C" {% if request.args.get('shift')=='C' %}selected{% endif %}>C</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold small">Quality Status</label>
+                <select name="quality_status" class="form-select" id="qualityStatusFilter">
+                    <option value="">All</option>
+                    <option value="pending" {% if request.args.get('quality_status')=='pending' %}selected{% endif %}>Pending Inspection</option>
+                    <option value="completed" {% if request.args.get('quality_status')=='completed' %}selected{% endif %}>Inspection Completed</option>
+                </select>
+            </div>
+            <div class="col-md-3 d-flex align-items-end gap-2">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="fas fa-search me-1"></i>Apply Filters
+                </button>
+                <a href="{{ url_for('rejection.rejection_records') }}" class="btn btn-outline-secondary w-100">
+                    <i class="fas fa-redo me-1"></i>Reset
+                </a>
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <a href="{{ url_for('rejection.export_rejection_records', **request.args) }}" class="btn btn-success w-100">
+                    <i class="fas fa-file-excel me-1"></i>Export Excel
+                </a>
+            </div>
+        </div>
+        </form>
+        <div class="mt-3">
+            <p class="small text-muted mb-0">
+                Production&apos;s <strong>Total OK (Auto)</strong> comes from <code>ProductionEntry.total_ok_quantity</code> as actual OK pieces minus the current recorded quality rejects. Rework recorded in the rejection form is shown separately; only explicit <strong>Log Rework</strong> actions reduce the rejection balance used by final OK.
+            </p>
+        </div>
+    </div>
+
+<!-- Analytics Summary Cards -->
+<div class="row" id="summaryCards">
+    <div class="col-6 col-lg-3">
+        <div class="stat-card">
+            <div class="stat-value" id="totalInspected">-</div>
+            <div class="stat-label">Total Inspected Qty</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="stat-card orange">
+            <div class="stat-value" id="totalPcs">-</div>
+            <div class="stat-label">Total Rejection Pieces</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="stat-card green">
+            <div class="stat-value" id="totalWeight">-</div>
+            <div class="stat-label">Total Rejection Weight (kg)</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="stat-card" style="background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%);">
+            <div class="stat-value" id="totalRecords">-</div>
+            <div class="stat-label">Total Quality Records</div>
+        </div>
+    </div>
+</div>
+
+<!-- Analytics Charts -->
+<div class="row">
+    <div class="col-lg-6">
+        <div class="card mb-4 shadow-sm border-0">
+            <div class="card-header bg-white py-3">
+                <div class="d-flex justify-content-between align-items-center gap-2">
+                    <h6 class="mb-0 fw-bold text-primary"><i class="fas fa-chart-bar me-2"></i>Rejections by Customer</h6>
+                    <button type="button" id="customerChartDataBtn" class="btn btn-sm btn-outline-secondary chart-data-btn"
+                        data-chart-title="Rejections by Customer"
+                        data-chart-columns='[{"key":"rank","label":"Rank"},{"key":"customer","label":"Customer"},{"key":"pcs","label":"Rejected PCS"},{"key":"weight","label":"Rejected Weight (kg)"},{"key":"share_pct","label":"Share %"},{"key":"avg_weight_per_pc","label":"Avg Weight / PC (kg)"}]'
+                        data-chart-rows='[]'>View Data</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="customerChart"></canvas>
+                </div>
+                <div id="customerChartInsight" class="alert alert-light border small mb-0"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card mb-4 shadow-sm border-0">
+            <div class="card-header bg-white py-3">
+                <div class="d-flex justify-content-between align-items-center gap-2">
+                    <h6 class="mb-0 fw-bold text-primary"><i class="fas fa-chart-pie me-2"></i>Rejections by Defect Type</h6>
+                    <button type="button" id="reasonChartDataBtn" class="btn btn-sm btn-outline-secondary chart-data-btn"
+                        data-chart-title="Rejections by Defect Type"
+                        data-chart-columns='[{"key":"rank","label":"Rank"},{"key":"defect_type","label":"Defect Type"},{"key":"pcs","label":"Rejected PCS"},{"key":"share_pct","label":"Share %"},{"key":"severity_band","label":"Contribution Band"}]'
+                        data-chart-rows='[]'>View Data</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="reasonChart"></canvas>
+                </div>
+                <div id="reasonChartInsight" class="alert alert-light border small mb-0"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card mb-4 shadow-sm border-0">
+            <div class="card-header bg-white py-3">
+                <div class="d-flex justify-content-between align-items-center gap-2">
+                    <h6 class="mb-0 fw-bold text-primary"><i class="fas fa-chart-line me-2"></i>Quality Trend (Last 6
+                        Months)</h6>
+                    <button type="button" id="trendChartDataBtn" class="btn btn-sm btn-outline-secondary chart-data-btn"
+                        data-chart-title="Quality Trend (Last 6 Months)"
+                        data-chart-columns='[{"key":"month","label":"Month"},{"key":"pcs","label":"Rejected PCS"},{"key":"weight","label":"Rejected Weight (kg)"},{"key":"avg_weight_per_pc","label":"Avg Weight / PC (kg)"},{"key":"mom_pcs_change","label":"MoM PCS Change"},{"key":"mom_weight_change","label":"MoM Weight Change"}]'
+                        data-chart-rows='[]'>View Data</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="trendChart"></canvas>
+                </div>
+                <div id="trendChartInsight" class="alert alert-light border small mb-0"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Records Table -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h5 class="mb-0 fw-bold text-primary"><i class="fas fa-table me-2"></i>Rejection Records</h5>
+        <a href="{{ url_for('web.view_entries', quality_status='pending') }}" class="btn btn-primary shadow-sm">
+            <i class="fas fa-plus-circle me-1"></i>New Entry (From Pending)
+        </a>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle" id="rejectionRecordsTable">
+                <thead class="bg-primary text-white">
+                    <tr>
+                        <th class="ps-3">Datetime</th>
+                        <th class="d-none d-md-table-cell">Entry No</th>
+                        <th>Customer / Job</th>
+                        <th class="d-none d-md-table-cell">Defect Type</th>
+                        <th>Inspec Qty</th>
+                        <th>R/J (PCS/KG)</th>
+                        <th class="d-none d-md-table-cell">Defects</th>
+                        <th class="d-none d-md-table-cell">Supervisor(s)</th>
+                        <th class="text-center pe-3">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if rejections %}
+                    {% for rejection in rejections %}
+                    {% set ns = namespace(items=[]) %}
+                    {% for d in rejection.defects %}
+                    {% if d.defect_type and d.defect_type.defect_name and ns.items.append(d.defect_type.defect_name) %}{% endif %}
+                    {% endfor %}
+                    <tr>
+                        <td class="ps-3 fw-bold small text-nowrap">
+                            {{ rejection.rejection_datetime.strftime('%d-%m-%Y') if rejection.rejection_datetime else
+                            rejection.rejection_date.strftime('%d-%m-%Y') }}<br>
+                            <span class="text-muted fw-normal">{{ rejection.rejection_datetime.strftime('%H:%M') if
+                                rejection.rejection_datetime else '-' }}</span>
+                        </td>
+                        <td class="fw-bold d-none d-md-table-cell">{{ rejection.production_entry_obj.entry_no if rejection.production_entry_obj else '-' }}</td>
+                        <td>
+                            <div class="fw-bold">{{ rejection.customer.customer_name }}</div>
+                            <div class="small text-muted">{{ rejection.section_number }} | {{ rejection.length if
+                                rejection.length else '-' }} mm</div>
+                            <div class="d-md-none mt-1 small">
+                                <span class="badge bg-light text-dark border">
+                                    Entry: {{ rejection.production_entry_obj.entry_no if rejection.production_entry_obj else '-' }}
+                                </span>
+                                <span class="badge bg-soft-info text-info border border-info border-opacity-10 ms-1">
+                                    {{ ns.items | join(', ') if ns.items else 'N/A' }}
+                                </span>
+                            </div>
+                        </td>
+                        <td class="d-none d-md-table-cell">
+                            <span class="badge bg-soft-info text-info border border-info border-opacity-10">
+                                {{ ns.items | join(', ') if ns.items else 'N/A' }}
+                            </span>
+                        </td>
+                        <td class="fw-bold">{{ rejection.total_parts_inspected_qty }}</td>
+                        <td>
+                            <div class="text-danger fw-bold">{{ rejection.rj_pcs }} PCS</div>
+                            <div class="small text-muted">{{ "%.3f"|format(rejection.rj_weight) }} KG</div>
+                        </td>
+                        <td class="d-none d-md-table-cell" style="max-width: 200px;">
+                            <div class="small text-truncate" title="{{ rejection.rejection_reason }}">
+                                {{ rejection.rejection_reason }}
+                            </div>
+                        </td>
+                        <td class="d-none d-md-table-cell">
+                            {% for sup in rejection.supervisors %}
+                            <div class="mb-1">
+                                <span class="badge bg-soft-primary text-primary border border-primary border-opacity-10"
+                                    title="Inspection: {{ sup.start_time.strftime('%H:%M') if sup.start_time else '-' }} to {{ sup.end_time.strftime('%H:%M') if sup.end_time else '-' }}">
+                                    <i class="fas fa-user-check me-1"></i>{{ sup.supervisor_info.emp_name }}
+                                </span>
+                            </div>
+                            {% endfor %}
+                        </td>
+                        <td class="text-center pe-3">
+                            <button type="button" class="btn btn-outline-primary btn-sm view-rejection-detail-btn"
+                                data-rejection-id="{{ rejection.id }}" title="View Full Detail">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% else %}
+                    <tr>
+                        <td colspan="9" class="text-center text-muted py-5">
+                            <i class="fas fa-inbox fa-3x mb-3 d-block opacity-25"></i>
+                            <p class="mb-0">No quality rejection records found matching your filters.</p>
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    {% if pagination.pages > 1 %}
+    <div class="card-footer bg-white py-3">
+        <nav>
+            <ul class="pagination justify-content-center mb-0">
+                {% if pagination.has_prev %}
+                <li class="page-item">
+                    <a class="page-link"
+                        href="{{ url_for('rejection.rejection_records', page=pagination.prev_num, **request.args) }}">Previous</a>
+                </li>
+                {% endif %}
+
+                {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+                {% if page_num %}
+                <li class="page-item {% if page_num == pagination.page %}active{% endif %}">
+                    <a class="page-link"
+                        href="{{ url_for('rejection.rejection_records', page=page_num, **request.args) }}">{{ page_num
+                        }}</a>
+                </li>
+                {% else %}
+                <li class="page-item disabled"><span class="page-link">...</span></li>
+                {% endif %}
+                {% endfor %}
+
+                {% if pagination.has_next %}
+                <li class="page-item">
+                    <a class="page-link"
+                        href="{{ url_for('rejection.rejection_records', page=pagination.next_num, **request.args) }}">Next</a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Unified Detail Modal -->
+<div class="modal fade" id="detailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 15px; overflow: hidden;">
+            <div class="modal-header bg-primary text-white border-0 py-3 d-flex justify-content-between">
+                <h5 class="modal-title fw-bold"><i class="fas fa-certificate me-2"></i> Quality Inspection & Rework
+                    Record</h5>
+                <div class="d-flex align-items-center gap-2">
+                    <div id="reworkActionPlaceholder"></div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                        aria-label="Close"></button>
+                </div>
+            </div>
+            <div class="modal-body p-0" id="modalBody">
+                <!-- Data loaded via AJAX -->
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2 text-muted">Stitching together quality data...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Rework Modal -->
+<div class="modal fade" id="reworkModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="fas fa-tools me-2"></i>Log Rework Quantity</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="reworkForm">
+                <div class="modal-body p-4">
+                    <input type="hidden" name="production_id" id="reworkProdId">
+                    <input type="hidden" name="rejection_id" id="reworkRejectionId">
+                    <div class="mb-4 text-center">
+                        <div class="display-6 fw-bold text-success" id="reworkAvailableDisplay">0</div>
+                        <small class="text-muted font-monospace text-uppercase">Pieces Available for Rework</small>
+                        <div class="text-muted small mt-1" id="reworkDefectHint">Select a defect type to see availability.</div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="small fw-semibold text-uppercase text-muted mb-2">Rejects per defect type</div>
+                        <div id="reworkDefectList">
+                            <div class="text-center text-muted small">Pick a rejection to view defects.</div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Defect Type <span class="text-danger">*</span></label>
+                        <select name="defect_type_id" id="reworkDefectSelect" class="form-select form-select-lg" required>
+                            <option value="">Select defect type</option>
+                        </select>
+                        <small class="text-muted">Choose which defect label the rework quantity belongs to.</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Reworked OK Quantity <span
+                                class="text-danger">*</span></label>
+                        <input type="number" name="rework_qty" class="form-control form-control-lg" required min="1">
+                        <small class="text-muted">Quantity that was successfully reworked and is now OK.</small>
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label fw-bold">Rework Remarks</label>
+                        <textarea name="remarks" class="form-control" rows="2"
+                            placeholder="Explain the rework process..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light border-0">
+                    <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success px-4" id="submitRework">
+                        <i class="fas fa-check-circle me-1"></i>Apply Rework
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (() => {
+    let customerChart, reasonChart, trendChart;
+    const sum = (arr) => (arr || []).reduce((a, b) => a + (Number(b) || 0), 0);
+    function notify(type, title, text, onOk) {
+        if (window.Swal && typeof window.Swal.fire === 'function') {
+            window.Swal.fire({ icon: type, title: title, text: text }).then(() => { if (onOk) onOk(); });
+            return;
+        }
+        alert((title ? title + ': ' : '') + (text || ''));
+        if (onOk) onOk();
+    }
+    function setInsight(id, text) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = text;
+    }
+    function setChartRows(buttonId, rows) {
+        const btn = document.getElementById(buttonId);
+        if (btn) btn.dataset.chartRows = JSON.stringify(rows || []);
+    }
+
+    // Cascading filters: customer -> section -> cut length.
+    (function initCascadingFilters() {
+        const customer = document.getElementById('customerFilter');
+        const section = document.getElementById('sectionFilter');
+        const cutLength = document.getElementById('cutLengthFilter');
+        let selectedSection = section ? section.dataset.selected : '';
+        let selectedCutLength = cutLength ? cutLength.dataset.selected : '';
+        function resetSelect(el, label) {
+            if (!el) return;
+            el.innerHTML = '';
+            el.add(new Option(label, ''));
+        }
+        function fetchJson(url) {
+            return fetch(url).then(r => {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.json();
+            });
+        }
+        function loadSections() {
+            if (!customer || !section) return Promise.resolve();
+            const customerId = customer.value;
+            if (!customerId) {
+                resetSelect(section, 'All Sections');
+                resetSelect(cutLength, 'All Cut Lengths');
+                return Promise.resolve();
+            }
+            return fetchJson('/master/api/sections/' + encodeURIComponent(customerId))
+                .then(rows => {
+                    resetSelect(section, 'All Sections');
+                    (rows || []).forEach(s => section.add(new Option(s.number, s.number)));
+                    if (selectedSection) {
+                        section.value = selectedSection;
+                        selectedSection = '';
+                    }
+                    return loadCutLengths();
+                })
+                .catch(() => {
+                    resetSelect(section, 'All Sections');
+                    resetSelect(cutLength, 'All Cut Lengths');
+                });
+        }
+        function loadCutLengths() {
+            if (!customer || !section || !cutLength) return Promise.resolve();
+            const customerId = customer.value;
+            const sectionNumber = section.value;
+            if (!customerId || !sectionNumber) {
+                resetSelect(cutLength, 'All Cut Lengths');
+                return Promise.resolve();
+            }
+            return fetchJson('/master/api/sections/' + encodeURIComponent(customerId))
+                .then(rows => {
+                    const match = (rows || []).find(s => String(s.number) === String(sectionNumber));
+                    if (!match) throw new Error('Section not found');
+                    return fetchJson('/master/api/cut-lengths/' + encodeURIComponent(match.id));
+                })
+                .then(rows => {
+                    resetSelect(cutLength, 'All Cut Lengths');
+                    (rows || []).forEach(cl => cutLength.add(new Option(String(cl.length), String(cl.length))));
+                    if (selectedCutLength) {
+                        cutLength.value = selectedCutLength;
+                        selectedCutLength = '';
+                    }
+                })
+                .catch(() => {
+                    resetSelect(cutLength, 'All Cut Lengths');
+                });
+        }
+        if (customer) customer.addEventListener('change', loadSections);
+        if (section) section.addEventListener('change', loadCutLengths);
+        if (customer && customer.value) loadSections();
+    })();
+
+    async function loadAnalytics() {
+        const params = new URLSearchParams(window.location.search);
+        try {
+            const response = await fetch(`/rejection/api/analytics?${params.toString()}`);
+            const data = await response.json();
+
+            document.getElementById('totalInspected').textContent = (data.summary.total_inspected || 0).toLocaleString();
+            document.getElementById('totalPcs').textContent = data.summary.total_pcs.toLocaleString();
+            document.getElementById('totalWeight').textContent = data.summary.total_weight.toLocaleString();
+            document.getElementById('totalRecords').textContent = data.summary.total_records.toLocaleString();
+
+            updateCustomerChart(data.by_customer);
+            updateReasonChart(data.by_defect_type);
+            updateTrendChart(data.monthly_trend);
+        } catch (error) { console.error('Error loading analytics:', error); }
+    }
+
+    function updateCustomerChart(data) {
+        data = Array.isArray(data) ? data : [];
+        const totalPcs = sum(data.map(d => Number(d.pcs) || 0));
+        setChartRows('customerChartDataBtn', data
+            .slice()
+            .sort((a, b) => (Number(b.pcs) || 0) - (Number(a.pcs) || 0))
+            .map((d, idx) => {
+                const pcs = Number(d.pcs) || 0;
+                const weight = Number(d.weight) || 0;
+                return {
+                    rank: idx + 1,
+                    customer: d.customer || 'Unknown',
+                    pcs: pcs.toFixed(0),
+                    weight: weight.toFixed(3),
+                    share_pct: totalPcs > 0 ? ((pcs / totalPcs) * 100).toFixed(1) + '%' : '0.0%',
+                    avg_weight_per_pc: pcs > 0 ? (weight / pcs).toFixed(3) : '0.000'
+                };
+            }));
+        const ctx = document.getElementById('customerChart').getContext('2d');
+        if (customerChart) customerChart.destroy();
+        customerChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: data.map(d => d.customer),
+                datasets: [{
+                    label: 'Rejection Pcs',
+                    data: data.map(d => d.pcs),
+                    backgroundColor: 'rgba(99, 102, 241, 0.7)',
+                    borderColor: 'rgba(99, 102, 241, 1)',
+                    borderWidth: 1,
+                    borderRadius: 5
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+        });
+        const total = sum(data.map(d => d.pcs));
+        const top = (data || []).slice().sort((a, b) => (Number(b.pcs) || 0) - (Number(a.pcs) || 0))[0];
+        const topPcs = top ? (Number(top.pcs) || 0) : 0;
+        const share = total > 0 ? (topPcs / total * 100) : 0;
+        setInsight('customerChartInsight', `Total rejection is ${total.toFixed(0)} pcs. Highest rejection customer is ${top ? top.customer : 'N/A'} with ${topPcs.toFixed(0)} pcs (${share.toFixed(1)}%).`);
+    }
+
+    function updateReasonChart(data) {
+        data = Array.isArray(data) ? data : [];
+        const totalPcs = sum(data.map(d => Number(d.pcs) || 0));
+        setChartRows('reasonChartDataBtn', data
+            .slice()
+            .sort((a, b) => (Number(b.pcs) || 0) - (Number(a.pcs) || 0))
+            .map((d, idx) => {
+                const pcs = Number(d.pcs) || 0;
+                const share = totalPcs > 0 ? (pcs / totalPcs) * 100 : 0;
+                return {
+                    rank: idx + 1,
+                    defect_type: d.defect_type || 'Other',
+                    pcs: pcs.toFixed(0),
+                    share_pct: share.toFixed(1) + '%',
+                    severity_band: share >= 40 ? 'High concentration' : (share >= 20 ? 'Medium concentration' : 'Long tail')
+                };
+            }));
+        const ctx = document.getElementById('reasonChart').getContext('2d');
+        if (reasonChart) reasonChart.destroy();
+        const colors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#8b5cf6'];
+        reasonChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: data.map(d => d.defect_type),
+                datasets: [{
+                    data: data.map(d => Number(d.pcs) || 0),
+                    backgroundColor: colors,
+                    hoverOffset: 15,
+                    borderWidth: 0
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, padding: 20 } } } }
+        });
+        const total = sum(data.map(d => d.pcs));
+        const top = (data || []).slice().sort((a, b) => (Number(b.pcs) || 0) - (Number(a.pcs) || 0))[0];
+        const topPcs = top ? (Number(top.pcs) || 0) : 0;
+        const share = total > 0 ? (topPcs / total * 100) : 0;
+        setInsight('reasonChartInsight', `Across defect types, total rejection is ${total.toFixed(0)} pcs. Top defect type is ${top ? top.defect_type : 'N/A'} with ${topPcs.toFixed(0)} pcs (${share.toFixed(1)}%).`);
+    }
+
+    function updateTrendChart(data) {
+        data = Array.isArray(data) ? data : [];
+        setChartRows('trendChartDataBtn', data.map((d, idx) => {
+            const pcs = Number(d.pcs) || 0;
+            const weight = Number(d.weight) || 0;
+            const prevPcs = idx > 0 ? (Number(data[idx - 1].pcs) || 0) : null;
+            const prevWeight = idx > 0 ? (Number(data[idx - 1].weight) || 0) : null;
+            const momPcsChange = prevPcs === null ? 'Baseline' : ((pcs - prevPcs) >= 0 ? '+' : '') + (pcs - prevPcs).toFixed(0);
+            const momWeightChange = prevWeight === null ? 'Baseline' : ((weight - prevWeight) >= 0 ? '+' : '') + (weight - prevWeight).toFixed(3);
+            return {
+                month: d.month,
+                pcs: pcs.toFixed(0),
+                weight: weight.toFixed(3),
+                avg_weight_per_pc: pcs > 0 ? (weight / pcs).toFixed(3) : '0.000',
+                mom_pcs_change: momPcsChange,
+                mom_weight_change: momWeightChange
+            };
+        }));
+        const ctx = document.getElementById('trendChart').getContext('2d');
+        if (trendChart) trendChart.destroy();
+        trendChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.map(d => d.month),
+                datasets: [{
+                    label: 'R/J Pcs',
+                    data: data.map(d => d.pcs),
+                    borderColor: '#6366f1',
+                    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                    tension: 0.4,
+                    fill: true,
+                    pointRadius: 5,
+                    pointHoverRadius: 6,
+                    spanGaps: true,
+                    pointBackgroundColor: '#6366f1'
+                }, {
+                    label: 'R/J Weight (kg)',
+                    data: data.map(d => d.weight),
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    tension: 0.4,
+                    fill: true,
+                    pointRadius: 5,
+                    pointHoverRadius: 6,
+                    spanGaps: true,
+                    pointBackgroundColor: '#10b981'
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' } }, scales: { y: { beginAtZero: true } } }
+        });
+        const pcs = (data || []).map(d => Number(d.pcs) || 0);
+        const wt = (data || []).map(d => Number(d.weight) || 0);
+        let peakIdx = -1;
+        for (let i = 0; i < pcs.length; i++) if (peakIdx === -1 || pcs[i] > pcs[peakIdx]) peakIdx = i;
+        const peakMonth = peakIdx >= 0 ? data[peakIdx].month : 'N/A';
+        const peakPcs = peakIdx >= 0 ? pcs[peakIdx] : 0;
+        setInsight('trendChartInsight', `In the shown months, total rejection is ${sum(pcs).toFixed(0)} pcs and ${sum(wt).toFixed(3)} kg. Peak month is ${peakMonth} with ${peakPcs.toFixed(0)} pcs rejected.`);
+    }
+
+        loadAnalytics();
+        window.currentReworkContext = null;
+
+        function populateReworkDefectSummary(context = window.currentReworkContext || {}) {
+            const defects = (context.defects || []).filter(d => Number(d.count) > 0);
+            const selectEl = document.getElementById('reworkDefectSelect');
+            const listEl = document.getElementById('reworkDefectList');
+            if (selectEl) {
+                const options = ['<option value="">Select defect type</option>'];
+                defects.forEach(def => {
+                    const available = Number(def.count) || 0;
+                    options.push(`<option value="${def.defect_type_id}" data-available="${available}">${def.name} (${available} pcs)</option>`);
+                });
+                selectEl.innerHTML = options.join('');
+            }
+            if (listEl) {
+                if (!defects.length) {
+                    listEl.innerHTML = '<div class="text-center text-muted small">No rejected defect counts remain for this record.</div>';
+                } else {
+                    listEl.innerHTML = defects.map(def => {
+                        const available = Number(def.count) || 0;
+                        return `<div class="d-flex justify-content-between align-items-center px-3 py-2 border rounded bg-white shadow-sm mb-2"><div><small class="text-muted">${def.category || 'Defect'}</small><div class="fw-semibold">${def.name}</div></div><span class="badge bg-warning text-dark">${available} pcs</span></div>`;
+                    }).join('');
+                }
+            }
+        }
+
+        function updateReworkQtyConstraints() {
+            const selectEl = document.getElementById('reworkDefectSelect');
+            const qtyInput = document.querySelector('input[name="rework_qty"]');
+            const hintEl = document.getElementById('reworkDefectHint');
+            if (!qtyInput || !selectEl) return;
+            const option = selectEl.selectedOptions[0];
+            const available = option ? Number(option.dataset.available || 0) : 0;
+            const totalMax = Math.max(available, window.currentReworkContext?.totalRejected || 0);
+            qtyInput.setAttribute('max', totalMax || 0);
+            if (hintEl) {
+                const label = option ? option.textContent : '';
+                hintEl.textContent = available ? `${available} rejects available for ${label}` : 'Select a defect type to see available rejects.';
+            }
+        }
+
+        // Detail Modal with Rework
+    document.addEventListener('click', async function (evt) {
+        const btn = evt.target.closest('.view-rejection-detail-btn');
+        if (!btn) return;
+        const rejectionId = btn.getAttribute('data-rejection-id');
+        const detailModalEl = document.getElementById('detailModal');
+        const modalBody = document.getElementById('modalBody');
+        const reworkPlaceholder = document.getElementById('reworkActionPlaceholder');
+        const modal = (window.bootstrap && detailModalEl) ? new window.bootstrap.Modal(detailModalEl) : null;
+
+        if (modal) modal.show();
+        if (reworkPlaceholder) reworkPlaceholder.innerHTML = '';
+        if (modalBody) {
+            modalBody.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-2 text-muted">Fetching quality dossier...</p></div>';
+        }
+
+        try {
+            const response = await fetch(`/rejection/api/rejection-detail/${rejectionId}`);
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error);
+
+            const rejection = data.rejection;
+            const production = data.production;
+            const reworkDetails = production?.rework_details || [];
+            const reworkHistory = production?.rework_history || [];
+            const totalReworkQty = Number(production?.rework_qty ?? production?.total_rework_qty ?? 0);
+            const totalReworkWeight = Number(production?.rework_weight || 0);
+            const finalOkQty = production
+                ? Number(production.total_ok || 0)
+                : Math.max(0, Number(production?.actual_quantity || 0) - Number(rejection.rj_pcs || 0));
+            window.currentReworkContext = {
+                rejectionId: rejection.id,
+                productionId: production ? production.id : null,
+                totalRejected: Number(rejection.rj_pcs || 0),
+                defects: rejection.defects || []
+            };
+            populateReworkDefectSummary(window.currentReworkContext);
+            const inspectedQty = Number(rejection.total_parts_inspected_qty || 0);
+            const rejectedQty = Number(rejection.rj_pcs || 0);
+            const qualityScore = inspectedQty > 0 ? Math.max(0, ((inspectedQty - rejectedQty) / inspectedQty) * 100) : 0;
+
+            // Update Rework button if applicable
+            if (production && rejection.rj_pcs > 0) {
+                reworkPlaceholder.innerHTML = `
+                    <button type="button" class="btn btn-success btn-sm px-3 shadow-sm border border-light open-rework-modal" 
+                             data-prod-id="${production.id}" data-max="${rejection.rj_pcs}" data-rejection-id="${rejection.id}">
+                        <i class="fas fa-tools me-1"></i>Log Rework
+                    </button>
+                `;
+            }
+
+            modalBody.innerHTML = `
+                <div class="row g-0">
+                    <!-- Left Panel: Context -->
+                    <div class="col-lg-4 bg-light border-end p-4">
+                        <section class="mb-4">
+                            <h6 class="fw-bold text-muted text-uppercase small mb-3">Rejection Context</h6>
+                            <div class="mb-2"><strong>Datetime:</strong> ${new Date(rejection.rejection_datetime).toLocaleString()}</div>
+                            <div class="mb-2"><strong>Shift:</strong> <span class="badge bg-primary">${production ? production.shift : '-'}</span></div>
+                            <div class="mb-2"><strong>Customer:</strong> ${rejection.customer_name}</div>
+                            <div class="mb-2"><strong>Section:</strong> ${rejection.section_number}</div>
+                            <div class="mb-0"><strong>Length:</strong> ${rejection.length} mm</div>
+                        </section>
+                        
+                        <section class="mb-4">
+                             <h6 class="fw-bold text-muted text-uppercase small mb-3">Linked Production</h6>
+                             ${production ? `
+                                      <div class="p-2 border rounded bg-white small">
+                                         <div class="d-flex justify-content-between"><span>Entry:</span> <strong>${production.entry_no}</strong></div>
+                                         <div class="d-flex justify-content-between"><span>Prod OK:</span> <strong class="text-primary">${production.actual_quantity}</strong></div>
+                                         <div class="d-flex justify-content-between"><span>Reworked:</span> <strong class="text-success">${production.rework_qty || 0}</strong></div>
+                                         <div class="d-flex justify-content-between"><span>Rework Wt:</span> <strong class="text-success">${totalReworkWeight.toFixed(3)} kg</strong></div>
+                                         ${reworkDetails.length ? `
+                                                  <div class="mt-2 border-top pt-2 small">
+                                                  <strong class="d-block mb-1">Rework Materials</strong>
+                                              ${reworkDetails.map(detail => `
+                                                 <div class="d-flex justify-content-between">
+                                                     <span>${detail.defect_type || 'Defect'}</span>
+                                                     <span class="fw-semibold text-success">${Number(detail.rework_qty || 0).toFixed(0)} pcs</span>
+                                                 </div>
+                                             `).join('')}
+                                         </div>
+                                     ` : ''}
+                                 </div>
+                            ` : '<span class="text-muted italic">No direct production link</span>'}
+                       </section>
+
+                        <section>
+                            <h6 class="fw-bold text-muted text-uppercase small mb-3">Verified By</h6>
+                            ${rejection.supervisors.map(sup => `
+                                <div class="bg-white p-2 border rounded mb-2 small shadow-xs">
+                                    <div class="fw-bold"><i class="fas fa-user-check text-success me-1"></i>${sup.name}</div>
+                                    <div class="text-muted" style="font-size: 0.75rem;">${sup.start_time ? sup.start_time : 'N/A'} - ${sup.end_time ? sup.end_time : 'N/A'}</div>
+                                </div>
+                            `).join('')}
+                        </section>
+                    </div>
+
+                    <!-- Right Panel: Findings -->
+                    <div class="col-lg-8 p-4">
+                        <div class="alert bg-soft-primary border-primary border-opacity-10 d-flex justify-content-between align-items-center mb-4">
+                            <div>
+                                <h4 class="mb-0 fw-bold text-primary">${rejection.total_parts_inspected_qty}</h4>
+                                <small class="text-muted text-uppercase fw-bold">Total Inspected</small>
+                            </div>
+                            <div class="text-end">
+                                <h4 class="mb-0 fw-bold text-danger">${rejection.rj_pcs}</h4>
+                                <small class="text-muted text-uppercase fw-bold">Total Rejected</small>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-light border d-flex justify-content-between align-items-center mb-4">
+                            <div>
+                                <small class="text-muted text-uppercase fw-bold d-block">Quality Score</small>
+                                <span class="fw-bold ${qualityScore >= 85 ? 'text-success' : (qualityScore >= 70 ? 'text-warning' : 'text-danger')}">${qualityScore.toFixed(1)}%</span>
+                            </div>
+                            <div class="text-end">
+                                <small class="text-muted text-uppercase fw-bold d-block">Quality Remarks</small>
+                                <span>${rejection.rejection_reason || 'N/A'}</span>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-light border-success d-flex justify-content-between align-items-center mb-4">
+                            <div>
+                                <small class="text-muted text-uppercase fw-bold d-block">Final OK Count</small>
+                                <span class="fw-bold text-success">${finalOkQty.toFixed(0)}</span>
+                            </div>
+                            <div class="text-end">
+                                <small class="text-muted small">= Produced OK - current recorded quality rejects</small>
+                                <br>
+                                <small class="text-muted">Rework entered in rejection form is shown separately. Final OK changes when rejection balance is explicitly reduced.</small>
+                            </div>
+                        </div>
+
+                        <h6 class="fw-bold border-bottom pb-2 mb-3"><i class="fas fa-list-ol text-primary me-2"></i>Defect Breakdown</h6>
+                        <div class="table-responsive mb-4">
+                            <table class="table table-sm align-middle table-striped">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Defect Type</th>
+                                        <th class="text-end">Count</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${rejection.defects.map(d => `
+                                        <tr>
+                                            <td>${d.name}</td>
+                                            <td class="text-end fw-bold">${d.count} PCS</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                                <tfoot class="table-light fw-bold">
+                                    <tr>
+                                        <td>TOTAL</td>
+                                        <td class="text-end text-danger">${rejection.rj_pcs} PCS</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+
+                        <div class="alert alert-light border-danger d-flex justify-content-between align-items-center mb-4">
+                            <div>
+                                <small class="text-muted text-uppercase fw-bold d-block">Total R/J Weight</small>
+                                <span class="fw-bold text-danger">${Number(rejection.rj_weight || 0).toFixed(3)} kg</span>
+                            </div>
+                            <div class="text-end">
+                                <small class="text-muted text-uppercase fw-bold d-block">Weight / PC</small>
+                                <span>${Number(rejection.weight_per_pcs || 0).toFixed(3)} kg</span>
+                            </div>
+                        </div>
+
+                        <h6 class="fw-bold border-bottom pb-2 mb-3"><i class="fas fa-comment shadow-sm me-2"></i>QA Remarks</h6>
+                        <div class="p-3 bg-light border rounded mb-0 italic">
+                            ${rejection.rejection_reason || 'No specific remarks.'}
+                        </div>
+
+                        <div class="mb-4">
+                            <h6 class="fw-bold border-bottom pb-2 mb-3"><i class="fas fa-tools text-success me-2"></i>Rework Summary</h6>
+                            ${reworkDetails.length ? `
+                                <div class="table-responsive mb-3">
+                                    <table class="table table-sm align-middle mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Defect</th>
+                                                <th class="text-end">Qty</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${reworkDetails.map(detail => `
+                                            <tr>
+                                                <td>${detail.defect_type || 'Defect'}</td>
+                                                <td class="text-end fw-bold">${Number(detail.rework_qty || 0).toFixed(0)} pcs</td>
+                                            </tr>`).join('')}
+                                        </tbody>
+                                        <tfoot class="table-light fw-bold">
+                                            <tr>
+                                                <td>Total</td>
+                                                <td class="text-end text-success">${Number(totalReworkQty).toFixed(0)} pcs</td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                                <div class="alert alert-light border-success d-flex justify-content-between align-items-center mb-3">
+                                    <div>
+                                        <small class="text-muted text-uppercase fw-bold d-block">Total Rework Weight</small>
+                                        <span class="fw-bold text-success">${totalReworkWeight.toFixed(3)} kg</span>
+                                    </div>
+                                    <div class="text-end">
+                                        <small class="text-muted text-uppercase fw-bold d-block">Gross Reject Balance</small>
+                                        <span class="fw-bold text-danger">${Number(rejection.rj_pcs || 0).toFixed(0)} pcs</span>
+                                    </div>
+                                </div>
+                                <div class="small text-muted mb-3">
+                                    Rework recorded in the rejection form is shown separately here. Rejection totals above remain gross until explicit log rework action reduces them.
+                                </div>
+                            ` : '<div class="text-muted small">No rework has been logged for this rejection.</div>'}
+                            ${reworkHistory.length ? `
+                                <div>
+                                    <h6 class="fw-semibold text-muted small mb-2">Rework Remarks & History</h6>
+                                    <div class="list-group list-group-flush">
+                                        ${reworkHistory.map(log => `
+                                            <div class="list-group-item d-flex justify-content-between align-items-center px-3 py-2">
+                                                <div>
+                                                    <div class="fw-semibold">${log.defect_type || 'Defect'}</div>
+                                                    <small class="text-muted">${log.created_by || 'system'} · ${log.created_at ? new Date(log.created_at).toLocaleString() : 'time unknown'}</small>
+                                                </div>
+                                                <div class="text-end">
+                                                    <div class="fw-bold">${Number(log.rework_qty || 0).toFixed(0)} pcs</div>
+                                                    <small class="text-muted">${log.remarks || 'Logged as defect-wise rework from rejection flow.'}</small>
+                                                </div>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+        } catch (error) {
+            if (modalBody) modalBody.innerHTML = `<div class="text-center py-5 text-danger"><i class="fas fa-exclamation-circle fa-3x mb-2"></i><p>${error.message}</p></div>`;
+        }
+    });
+
+    // Rework Logic
+    document.addEventListener('click', function (evt) {
+        const btn = evt.target.closest('.open-rework-modal');
+        if (!btn) return;
+        const context = window.currentReworkContext || {};
+        const prodId = btn.getAttribute('data-prod-id') || context.productionId;
+        const rejectionId = btn.getAttribute('data-rejection-id') || context.rejectionId;
+        const fallbackMax = btn.getAttribute('data-max');
+        const totalRejected = Number(context.totalRejected != null ? context.totalRejected : (fallbackMax || 0));
+        const reworkProdId = document.getElementById('reworkProdId');
+        const reworkRejectionId = document.getElementById('reworkRejectionId');
+        const reworkAvailableDisplay = document.getElementById('reworkAvailableDisplay');
+        const reworkQtyInput = document.querySelector('input[name="rework_qty"]');
+        if (reworkProdId) reworkProdId.value = prodId || '';
+        if (reworkRejectionId) reworkRejectionId.value = rejectionId || '';
+        if (reworkAvailableDisplay) reworkAvailableDisplay.textContent = totalRejected || '0';
+        if (reworkQtyInput) {
+            reworkQtyInput.setAttribute('max', totalRejected || 0);
+            reworkQtyInput.value = '';
+        }
+        populateReworkDefectSummary(context);
+        updateReworkQtyConstraints();
+        const reworkModalEl = document.getElementById('reworkModal');
+        if (window.bootstrap && reworkModalEl) {
+            new window.bootstrap.Modal(reworkModalEl).show();
+        }
+    });
+
+    const reworkDefectSelect = document.getElementById('reworkDefectSelect');
+    if (reworkDefectSelect) {
+        reworkDefectSelect.addEventListener('change', function () {
+            updateReworkQtyConstraints();
+        });
+    }
+
+    const reworkForm = document.getElementById('reworkForm');
+    if (reworkForm) reworkForm.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const btn = document.getElementById('submitRework');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Processing...';
+        }
+
+        try {
+            const formData = new FormData(reworkForm);
+            const response = await fetch('/rejection/api/log-rework', {
+                method: 'POST',
+                credentials: 'same-origin',
+                body: formData
+            });
+            const result = await response.json().catch(() => ({}));
+
+            if (result.success) {
+                notify('success', 'Rework Logged', result.message || 'Rework logged successfully.', function () { location.reload(); });
+            } else {
+                notify('error', 'Failed', result.error || ('Request failed with status ' + response.status));
+            }
+        } catch (e) {
+            notify('error', 'Error', 'Server communication error.');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-check-circle me-1"></i>Apply Rework';
+            }
+        }
+    });
+    })();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<style>
+    .bg-soft-primary {
+        background-color: rgba(99, 102, 241, 0.05);
+    }
+
+    .bg-soft-secondary {
+        background-color: rgba(108, 117, 125, 0.05);
+    }
+
+    .bg-soft-info {
+        background-color: rgba(13, 202, 240, 0.05);
+    }
+
+    .shadow-xs {
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.035);
+    }
+</style>
+{% endblock %}
+

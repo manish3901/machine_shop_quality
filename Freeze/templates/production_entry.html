@@ -1,0 +1,2617 @@
+{% extends "base.html" %}
+{% block extra_css %}
+<style>
+    .oee-gauge-container {
+        width: 120px;
+        height: auto;
+        min-height: 70px;
+        position: relative;
+    }
+
+    .oee-number {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        text-align: center;
+        font-weight: bold;
+        font-size: 1.2rem;
+    }
+
+    .sidebar-sticky {
+        position: sticky;
+        top: 20px;
+    }
+
+    .intelligence-card {
+        border-left: 5px solid #0d6efd;
+        transition: all 0.3s ease;
+    }
+
+    .metric-value {
+        font-family: 'Monaco', 'Consolas', monospace;
+        font-weight: bold;
+    }
+
+    .gauge-bg {
+        fill: none;
+        stroke: #e9ecef;
+        stroke-width: 10;
+        stroke-linecap: round;
+    }
+
+    .gauge-fill {
+        fill: none;
+        stroke-width: 10;
+        stroke-linecap: round;
+        transition: stroke-dasharray 0.5s ease, stroke 0.5s ease;
+    }
+
+    .status-green {
+        stroke: #198754;
+        color: #198754;
+    }
+
+    .status-yellow {
+        stroke: #ffc107;
+        color: #ffc107;
+    }
+
+    .status-red {
+        stroke: #dc3545;
+        color: #dc3545;
+    }
+
+    .oee-main-panel {
+        border: 1px solid rgba(255, 255, 255, 0.24);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.04) 100%);
+        border-radius: 1rem;
+        padding: 0.9rem 0.75rem;
+    }
+
+    .oee-live-panel {
+        border: 1px solid rgba(13, 110, 253, 0.45);
+        background: rgba(13, 110, 253, 0.14);
+        border-radius: 0.9rem;
+    }
+
+    .auto-calc-field {
+        background: #eef2f7 !important;
+        border: 1px dashed #b8c4d6 !important;
+        color: #5b6472;
+        cursor: not-allowed;
+    }
+
+    .auto-calc-field::placeholder {
+        color: #7a8699;
+        opacity: 1;
+    }
+</style>
+{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <!-- Main Form Column -->
+        <div class="col-xl-9 col-lg-8">
+            <div class="card shadow-lg border-0 rounded-4 overflow-hidden">
+                <div class="card-header bg-primary bg-gradient text-white p-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center">
+                            <div class="me-3">
+                                <h3 class="mb-1 fw-bold"><i class="fas fa-file-signature me-2"></i>Production Data Entry
+                                </h3>
+                                <p class="mb-0 opacity-75 small">Record machine output and shift times</p>
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge bg-white text-primary rounded-pill px-3 py-2 fw-bold shadow-sm">
+                                <i class="fas fa-calendar-day me-1"></i> {{ now.strftime('%d %b %Y') }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-body p-4 p-md-5">
+                    <form id="productionEntryForm" method="POST" action="{{ url_for('web.production_entry_form') }}">
+                        <!-- Shift Selection (Multi-Select Pills) -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold d-block mb-3">Select Production Shift(s)</label>
+                            <div class="d-flex flex-wrap gap-2">
+                                <button type="button" class="btn btn-outline-primary shift-pill rounded-pill px-4 py-2"
+                                    data-shift="A"><i class="fas fa-sun me-2"></i>Shift A</button>
+                                <button type="button" class="btn btn-outline-primary shift-pill rounded-pill px-4 py-2"
+                                    data-shift="B"><i class="fas fa-cloud-sun me-2"></i>Shift B</button>
+                                <button type="button" class="btn btn-outline-primary shift-pill rounded-pill px-4 py-2"
+                                    data-shift="C"><i class="fas fa-moon me-2"></i>Shift C</button>
+                            </div>
+                            <input type="hidden" name="shift" id="shift_hidden" required>
+                            <input type="hidden" name="production_date" id="production_date_hidden">
+                            <input type="hidden" name="no_cycle_time" id="no_cycle_time_flag" value="">
+                        </div>
+
+                        <div class="row g-4 mb-4">
+                            <div class="col-md-6">
+                                <label for="start_time" class="form-label fw-bold text-primary">Actual Production Start
+                                    Time</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-primary text-white border-0"><i
+                                            class="fas fa-clock"></i></span>
+                                    <input type="datetime-local" class="form-control" id="start_time" name="start_time"
+                                        required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="end_time" class="form-label fw-bold text-primary">Actual Production End
+                                    Time</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-primary text-white border-0"><i
+                                            class="fas fa-clock"></i></span>
+                                    <input type="datetime-local" class="form-control" id="end_time" name="end_time"
+                                        required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="my-4 opacity-25">
+
+                        <!-- Core Production Data -->
+                        <div class="row g-4 mb-4">
+                            <div class="col-md-4">
+                                <label for="shed_id" class="form-label fw-bold">Shed</label>
+                                <select class="form-select select2" id="shed_id" name="shed_id">
+                                    <option value="">Select Shed</option>
+                                    {% for shed in sheds %}
+                                    <option value="{{ shed.id }}">{{ shed.shed_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="machine_id" class="form-label fw-bold">Machine</label>
+                                <select class="form-select select2" id="machine_id" name="machine_id" required>
+                                    <option value="">Select Shed First</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="customer_id" class="form-label fw-bold">Customer</label>
+                                <select class="form-select select2" id="customer_id" name="customer_id" required>
+                                    <option value="">Select Customer</option>
+                                    {% for customer in customers %}
+                                    <option value="{{ customer.id }}">{{ customer.customer_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row g-4 mb-4">
+                            <div class="col-md-4">
+                                <label for="section_id" class="form-label fw-bold">Section Number</label>
+                                <select class="form-select" id="section_id" required>
+                                    <option value="">Select Customer First</option>
+                                </select>
+                                <input type="hidden" name="section_number" id="section_number_hidden">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="cl_id" class="form-label fw-bold">Cut Length (mm)</label>
+                                <select class="form-select" id="cl_id" required>
+                                    <option value="">Select Section First</option>
+                                </select>
+                                <input type="hidden" name="cutlength" id="cutlength_hidden">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="operation_type_id" class="form-label fw-bold">Operation / Process</label>
+                                <select class="form-select select2" id="operation_type_id" name="operation_type_id[]"
+                                    multiple required>
+                                </select>
+                            </div>
+                        </div>
+                        <!-- Quantities & Metrics -->
+                        <div class="row g-3 mb-4 align-items-end">
+                            <div class="col-lg col-md-6">
+                                <label for="planned_quantity" class="form-label fw-bold">Planned Qty</label>
+                                <input type="number" class="form-control" id="planned_quantity" name="planned_quantity"
+                                    required>
+                            </div>
+                            <div class="col-lg col-md-6">
+                                <label for="actual_quantity" class="form-label fw-bold">Actual OK Qty</label>
+                                <input type="number" class="form-control" id="actual_quantity" name="actual_quantity"
+                                    value="0" required min="0">
+                            </div>
+                            <div class="col-lg col-md-6">
+                                <label for="self_rejection_weight_per_pcs" class="form-label fw-bold">Weight/PC (kg)</label>
+                                <input type="number" step="0.001" class="form-control fw-bold" id="self_rejection_weight_per_pcs"
+                                    name="self_rejection_weight_per_pcs" placeholder="0" min="0.001" required>
+                            </div>
+                            <div class="col-lg col-md-6">
+                                <label for="ideal_cycle_time" class="form-label fw-bold">Ideal C/Time/pc
+                                    (Sum)</label>
+                                <input type="number" step="0.1" class="form-control auto-calc-field" id="ideal_cycle_time"
+                                    name="ideal_cycle_time" placeholder="Auto calculated" readonly>
+                            </div>
+                            <div class="col-lg col-md-6">
+                                <label class="form-label fw-bold text-danger">Prod Miss</label>
+                                <input type="text"
+                                    class="form-control border-danger bg-danger bg-opacity-10 text-danger fw-bold auto-calc-field"
+                                    id="production_miss" placeholder="Auto calculated" readonly>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <div class="card border border-danger border-opacity-25 shadow-sm rounded-4 overflow-hidden">
+                                <div class="card-header bg-danger bg-opacity-10 py-3 border-0 d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0 fw-bold text-dark"><i class="fas fa-trash-alt me-2"></i>Production Scrap Management</h6>
+                                    <button type="button" id="addSelfRejectionRowBtn" class="btn btn-sm btn-outline-danger rounded-pill px-3">
+                                        <i class="fas fa-plus me-1"></i> Add Self Rejection
+                                    </button>
+                                </div>
+                                <div class="card-body p-3">
+                                    <input type="hidden" id="self_rejection_qty" name="self_rejection_qty" value="0">
+                                    <div class="row g-3 mb-3 align-items-end">
+                                        <div class="col-lg-3 col-md-3 col-sm-6 order-1">
+                                            <label for="total_machining_scrap_kg" class="form-label fw-bold small">Total Machining Scrap (kg)</label>
+                                            <input type="number" step="0.001" class="form-control fw-bold text-danger" id="total_machining_scrap_kg" name="total_machining_scrap_kg" placeholder="0" min="0.001" required>
+                                        </div>
+                                        <div class="col-lg-3 col-md-3 col-sm-6 order-2">
+                                            <label for="self_rejection_total_pcs" class="form-label fw-bold small">Total Self Rejection PCS</label>
+                                            <input type="number" class="form-control fw-bold text-danger auto-calc-field" id="self_rejection_total_pcs" value="0" placeholder="Auto calculated" readonly>
+                                        </div>
+                                        <div class="col-lg-3 col-md-3 col-sm-6 order-3">
+                                            <label for="self_rejection_total_all_kg" class="form-label fw-bold small">Total Self Rejection (All)</label>
+                                            <input type="text" class="form-control fw-bold text-danger auto-calc-field" id="self_rejection_total_all_kg" value="0.000" placeholder="Auto calculated" readonly>
+                                        </div>
+                                        <div class="col-lg-3 col-md-3 col-sm-6 order-4">
+                                            <label for="self_rejection_total_kg" class="form-label fw-bold small">Total Self Rejection KGs</label>
+                                            <input type="text" class="form-control fw-bold text-danger auto-calc-field" id="self_rejection_total_kg" value="0.000" placeholder="Auto calculated" readonly>
+                                        </div>
+                                    </div>
+                                    <div class="table-responsive mb-3">
+                                        <table class="table table-sm align-middle mb-0" id="selfRejectionTable">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th style="width:60%">Defect Type</th>
+                                                    <th style="width:25%">Reject PCS Qty</th>
+                                                    <th style="width:15%" class="text-center">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="self_rejection_container">
+                                                <tr class="self-rejection-row">
+                                                    <td>
+                                                        <select class="form-select self-rejection-defect" name="self_rejection_defect_type_id[]">
+                                                            <option value="">Select Defect...</option>
+                                                            {% for defect in defect_types %}
+                                                            <option value="{{ defect.id }}">{{ defect.defect_name }}</option>
+                                                            {% endfor %}
+                                                        </select>
+                                                    </td>
+                                                    <td>
+                                                        <div class="input-group">
+                                                            <input type="number" class="form-control self-rejection-qty" name="self_rejection_defect_qty[]" value="" min="0" placeholder="0">
+                                                            <span class="input-group-text">PCS</span>
+                                                        </div>
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <button type="button" class="btn btn-sm btn-link text-danger remove-self-rejection-row" style="display:none;">
+                                                            <i class="fas fa-times-circle"></i>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <template id="self_rejection_row_template">
+                                        <tr class="self-rejection-row">
+                                            <td>
+                                                <select class="form-select self-rejection-defect" name="self_rejection_defect_type_id[]">
+                                                    <option value="">Select Defect...</option>
+                                                    {% for defect in defect_types %}
+                                                    <option value="{{ defect.id }}">{{ defect.defect_name }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </td>
+                                            <td>
+                                                <div class="input-group">
+                                                    <input type="number" class="form-control self-rejection-qty" name="self_rejection_defect_qty[]" value="" min="0" placeholder="0">
+                                                    <span class="input-group-text">PCS</span>
+                                                </div>
+                                            </td>
+                                            <td class="text-center">
+                                                <button type="button" class="btn btn-sm btn-link text-danger remove-self-rejection-row">
+                                                    <i class="fas fa-times-circle"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                    <div class="form-text small mt-2">Add machining/fabrication cutting scrap in kg. Defect-wise self rejection rows are optional and only for piece-based operator scrap.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Downtime Section -->
+                        <div class="mb-4">
+                            <div
+                                class="card border border-warning border-opacity-25 shadow-sm rounded-4 overflow-hidden">
+                                <div
+                                    class="card-header bg-warning bg-opacity-10 py-3 border-0 d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0 fw-bold text-dark"><i class="fas fa-clock me-2"></i>Planned Downtime
+                                        Management</h6>
+                                    <button type="button" id="toggleDowntimeBtn"
+                                        class="btn btn-sm btn-warning rounded-pill px-3">
+                                        <i class="fas fa-plus me-1"></i> Add Downtime
+                                    </button>
+                                </div>
+                                <div class="card-body p-3">
+                                    <div id="downtimeSection" style="display:none;">
+                                        <div id="downtime_container">
+                                            <div class="row g-2 mb-2 downtime-row">
+                                                <div class="col-md-7">
+                                                    <select class="form-select form-select-sm downtime-reason"
+                                                        name="downtime_reason_id[]">
+                                                        <option value="">Select Reason (NPD, Setup...)</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <input type="number"
+                                                        class="form-control form-control-sm downtime-duration"
+                                                        name="downtime_minutes[]" placeholder="Mins">
+                                                </div>
+                                                <div class="col-md-1">
+                                                    <button type="button"
+                                                        class="btn btn-sm btn-link text-danger remove-downtime"><i
+                                                            class="fas fa-times-circle"></i></button>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Template for new downtime row (hidden) -->
+                                        <div id="downtime_row_template" style="display:none;">
+                                            <div class="row g-2 mb-2 downtime-row">
+                                                <div class="col-md-7">
+                                                    <select class="form-select form-select-sm downtime-reason"
+                                                        name="downtime_reason_id[]">
+                                                        <option value="">Select Reason (NPD, Setup...)</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <input type="number"
+                                                        class="form-control form-control-sm downtime-duration"
+                                                        name="downtime_minutes[]" placeholder="Mins">
+                                                </div>
+                                                <div class="col-md-1">
+                                                    <button type="button"
+                                                        class="btn btn-sm btn-link text-danger remove-downtime"><i
+                                                            class="fas fa-times-circle"></i></button>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <button type="button" id="addMoreDowntime"
+                                            class="btn btn-link btn-sm text-warning p-0 text-decoration-none mb-3">
+                                            <i class="fas fa-plus-circle me-1"></i>Add Another Downtime
+                                        </button>
+                                    </div>
+
+                                    <div class="alert alert-soft-warning py-2 px-3 small d-flex flex-column mb-0">
+                                        <div class="d-flex align-items-center mb-1">
+                                            <i class="fas fa-info-circle me-2"></i>
+                                            <span>Total Planned Downtime: <strong><span
+                                                        id="total_planned_downtime_display">{{ fixed_downtime_total
+                                                        }}</span></strong> mins</span>
+                                        </div>
+                                        <div id="fixedReasonsList" class="text-muted"
+                                            style="font-size: 0.8rem; margin-left: 1.5rem;">
+                                            Includes: {% for r in fixed_reasons %}{{ r.reason_name }} ({{
+                                            r.default_minutes }}m){% if not loop.last %}, {% endif %}{% else %}0 mins
+                                            fixed{% endfor %}
+                                        </div>
+                                        <input type="hidden" name="total_planned_downtime" id="total_planned_dt_hidden"
+                                            value="{{ fixed_downtime_total }}">
+                                        <input type="hidden" id="base_fixed_downtime"
+                                            value="{{ fixed_downtime_total }}">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-2">
+                            <div class="col-md-4">
+                                <label for="total_shift_minutes" class="form-label fw-bold">Total Shift Time
+                                    (Mins)</label>
+                                <input type="number" class="form-control fw-bold auto-calc-field" id="total_shift_minutes"
+                                    placeholder="Auto calculated" readonly>
+                                <div class="form-text small">Sum of all selected shifts</div>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="total_downtime_minutes" class="form-label fw-bold text-warning">Total
+                                    Downtime (Mins)</label>
+                                <input type="number"
+                                    class="form-control fw-bold border-warning bg-warning bg-opacity-10 auto-calc-field"
+                                    id="total_downtime_minutes" placeholder="Auto calculated" readonly>
+                                <div class="form-text small">Planned + Breakdown (0)</div>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="total_time_taken_minutes" class="form-label fw-bold text-primary">Total
+                                    Available Machine Hours</label>
+                                <input type="number" class="form-control fw-bold border-primary auto-calc-field"
+                                    id="total_time_taken_minutes" name="total_time_taken_minutes" placeholder="Auto calculated" readonly>
+                                <div class="form-text small">Shift Time − Total Downtime</div>
+                            </div>
+                        </div>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label for="total_ideal_time_minutes" class="form-label fw-bold">Total Ideal Time
+                                    (Mins)</label>
+                                <input type="number" step="0.1" class="form-control auto-calc-field"
+                                    id="total_ideal_time_minutes" name="total_ideal_time_minutes" placeholder="Auto calculated" readonly>
+                                <div class="form-text small">Actual Qty &times; Ideal Cycle Time/Pcs (Sum)
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="total_unaccounted_time" class="form-label fw-bold text-danger">Total
+                                    Unaccounted Time (Mins)</label>
+                                <input type="number" step="0.1"
+                                    class="form-control fw-bold border-danger bg-danger bg-opacity-10 text-danger auto-calc-field"
+                                    id="total_unaccounted_time" placeholder="Auto calculated" readonly>
+                                <div class="form-text small">Available Hours − Total Ideal Time</div>
+                            </div>
+                        </div>
+
+                        <hr class="my-4 opacity-25">
+
+                        <!-- Operators (Multi) -->
+                        <div class="mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <label class="form-label fw-bold text-primary mb-0"><i
+                                        class="fas fa-users me-2"></i>Machine Operators &amp; Times</label>
+                                <button type="button" id="add_operator_btn" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-plus me-1"></i> Add Operator
+                                </button>
+                            </div>
+                            <div id="operators_container">
+                                <div
+                                    class="operator-row p-3 rounded mb-3 shadow-none border-start border-primary border-4 bg-light bg-opacity-50">
+                                    <div class="row g-3">
+                                        <div class="col-md-4">
+                                            <label class="small text-muted mb-1 d-block">Emp Code</label>
+                                            <div class="input-group input-group-sm">
+                                                <span class="input-group-text"><i class="fas fa-id-card"></i></span>
+                                                <input type="text" class="form-control operator-code"
+                                                    name="operator_code[]" placeholder="ID" required>
+                                            </div>
+                                            <input type="text"
+                                                class="form-control form-control-sm mt-1 bg-light border-0 operator-name-display"
+                                                readonly placeholder="Name...">
+                                            <input type="hidden" name="operator_id[]" class="operator-id-hidden">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="small text-muted mb-1 d-block">Start Time</label>
+                                            <input type="datetime-local"
+                                                class="form-control form-control-sm op-start-time"
+                                                name="op_start_time[]" required>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="small text-muted mb-1 d-block">End Time</label>
+                                            <div class="input-group input-group-sm">
+                                                <input type="datetime-local"
+                                                    class="form-control form-control-sm op-end-time"
+                                                    name="op_end_time[]" required>
+                                                <button type="button" class="btn btn-outline-danger remove-operator"
+                                                    style="display:none;"><i class="fas fa-trash"></i></button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Shift Supervisors (Multi) -->
+                        <div class="mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <label class="form-label fw-bold text-success mb-0"><i class="fas fa-user-tie me-2"></i>
+                                    Shift Supervisors &amp; Times</label>
+                                <button type="button" id="add_supervisor_btn" class="btn btn-sm btn-outline-success">
+                                    <i class="fas fa-plus me-1"></i> Add Supervisor
+                                </button>
+                            </div>
+                            <div id="supervisors_container">
+                                <div
+                                    class="supervisor-row p-3 rounded mb-3 shadow-none border-start border-success border-4 bg-light bg-opacity-50">
+                                    <div class="row g-3">
+                                        <div class="col-md-4">
+                                            <label class="small text-muted mb-1 d-block">Supervisor Code</label>
+                                            <div class="input-group input-group-sm">
+                                                <span class="input-group-text"><i class="fas fa-id-badge"></i></span>
+                                                <input type="text" class="form-control supervisor-code"
+                                                    name="supervisor_code[]" placeholder="ID" required>
+                                            </div>
+                                            <input type="text"
+                                                class="form-control form-control-sm mt-1 bg-light border-0 supervisor-name-display"
+                                                readonly placeholder="Name...">
+                                            <input type="hidden" name="supervisor_id[]" class="supervisor-id-hidden">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="small text-muted mb-1 d-block">Start Time</label>
+                                            <input type="datetime-local"
+                                                class="form-control form-control-sm sup-start-time"
+                                                name="sup_start_time[]" required>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="small text-muted mb-1 d-block">End Time</label>
+                                            <div class="input-group input-group-sm">
+                                                <input type="datetime-local"
+                                                    class="form-control form-control-sm sup-end-time"
+                                                    name="sup_end_time[]" required>
+                                                <button type="button" class="btn btn-outline-danger remove-supervisor"
+                                                    style="display:none;"><i class="fas fa-trash"></i></button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="remarks" class="form-label fw-bold">General Remarks / Notes</label>
+                            <textarea class="form-control" id="remarks" name="remarks" rows="2"
+                                placeholder="Note any specific delays or issues..."></textarea>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end pt-3 border-top mt-4">
+                            <button type="reset" class="btn btn-outline-secondary px-4 rounded-pill">Clear Form</button>
+                            <button type="submit" class="btn btn-primary btn-lg px-5 shadow-sm rounded-pill"
+                                id="submitBtn">
+                                <i class="fas fa-cloud-upload-alt me-2"></i>Submit Data Record
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Intelligence Sidebar -->
+        <div class="col-xl-3 col-lg-4 mt-4 mt-lg-0">
+            <div class="sidebar-sticky">
+                <!-- OEE Detailed Gauge -->
+                <div class="card shadow-sm border-0 bg-dark text-white overflow-hidden rounded-4 mb-4">
+                    <div class="card-body text-center py-4">
+                        <div class="oee-main-panel mb-3">
+                            <h6 class="text-uppercase opacity-50 small fw-bold mb-3">Live OEE Score</h6>
+                            <div class="position-relative d-inline-block mb-3" style="width: 180px;">
+                                <svg viewBox="0 0 100 50" class="w-100">
+                                    <path class="gauge-bg" d="M 10 45 A 35 35 0 0 1 90 45"
+                                        style="stroke: rgba(255,255,255,0.1);" />
+                                    <path id="sidebarOeePath" class="gauge-fill status-red"
+                                        d="M 10 45 A 35 35 0 0 1 90 45" stroke-dasharray="0, 126" />
+                                </svg>
+                                <div id="sidebarOeeText" class="display-6 fw-bold text-white" style="margin-top: -20px;">0%
+                                </div>
+                            </div>
+                            <div id="oeeStatusBadge" class="badge bg-danger rounded-pill px-3 py-2">Significant Improvement
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div class="card intelligence-card shadow-sm border-0 mb-4">
+                    <div class="card-header bg-white py-3 border-0">
+                        <h6 class="mb-0 fw-bold text-primary"><i class="fas fa-brain me-2"></i>Live Intelligence</h6>
+                    </div>
+                    <div class="card-body">
+                        <!-- Efficiency Metric -->
+                        <div class="mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="text-muted small fw-bold">EFFICIENCY</span>
+                                <span id="sidebarEffValue" class="metric-value text-dark">0%</span>
+                            </div>
+                            <div class="progress" style="height: 6px;">
+                                <div id="sidebarEffBar" class="progress-bar bg-primary" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <!-- Availability Metric -->
+                        <div class="mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="text-muted small fw-bold">AVAILABILITY</span>
+                                <span id="sidebarAvailValue" class="metric-value text-dark">0%</span>
+                            </div>
+                            <div class="progress" style="height: 6px;">
+                                <div id="sidebarAvailBar" class="progress-bar bg-info" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <!-- Performance Metric -->
+                        <div class="mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="text-muted small fw-bold">PERFORMANCE</span>
+                                <span id="sidebarPerfValue" class="metric-value text-dark">0%</span>
+                            </div>
+                            <div class="progress" style="height: 6px;">
+                                <div id="sidebarPerfBar" class="progress-bar bg-warning" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <hr class="my-3 opacity-10">
+
+                        <!-- Prediction / Insight -->
+                        <div id="sidebarInsight" class="alert alert-soft-primary border-0 small mb-0">
+                            <i class="fas fa-info-circle me-1"></i> Enter quantities to see performance analysis.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Overlap Conflict Modal -->
+<div class="modal fade" id="overlapConflictModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content glass-card border-0 shadow-lg">
+            <div class="modal-header bg-danger text-white border-0">
+                <h5 class="modal-title fw-bold"><i class="fas fa-exclamation-triangle me-2"></i>Production Time Overlap
+                    Detected</h5>
+            </div>
+            <div class="modal-body p-4">
+                <p class="mb-4">An existing production entry conflicts with the selected machine and time range. Please
+                    review the details below and adjust your entry.</p>
+
+                <div class="table-responsive">
+                    <table class="table table-bordered align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Field</th>
+                                <th>Existing Entry Details</th>
+                            </tr>
+                        </thead>
+                        <tbody id="conflictDetailsBody">
+                            <!-- Populated via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <div class="w-100 text-center">
+                    <button type="button" class="btn btn-secondary rounded-pill px-5"
+                        data-bs-dismiss="modal">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Downtime Confirmation Modal -->
+<div class="modal fade" id="confirmNoDowntimeModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-warning text-dark border-0">
+                <h5 class="modal-title font-weight-bold"><i class="fas fa-exclamation-triangle me-2"></i> No Planned
+                    Downtime Selected</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4 text-center">
+                <p class="mb-1 fw-bold fs-5">NO Planned downtime like Trials, Training, Setup time loss selected!</p>
+                <div class="mt-4 d-flex justify-content-center gap-3">
+                    <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">Continue
+                        Editing</button>
+                    <button type="button" class="btn btn-warning px-4" id="forceSubmitBtn">Submit Anyway</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        // Debug panel removed; keep flag off unless explicitly enabled from console.
+        var DROPDOWN_DEBUG = (window.MS_DROPDOWN_DEBUG === true);
+        function debugLog(msg) {
+            try {
+                if (!DROPDOWN_DEBUG) return;
+                var ts = new Date().toLocaleTimeString();
+                var line = '[' + ts + '] ' + msg;
+                console.log('[MS-DROPDOWN]', msg);
+                void line; // kept for future optional UI debug panel
+            } catch (e) { }
+        }
+
+        // Build API paths relative to the current app mount path.
+        function getAppBasePath() {
+            var form = document.getElementById('productionEntryForm');
+            if (!form || !form.action) return '';
+            var actionPath = new URL(form.action, window.location.origin).pathname;
+            return actionPath.replace(/\/production-entry\/?$/, '');
+        }
+
+        function withBase(path) {
+            var base = getAppBasePath();
+            if (!base) return path;
+            return (base + path).replace(/\/{2,}/g, '/');
+        }
+
+        function apiCandidates(path) {
+            var first = withBase(path);
+            var second = path;
+            return first === second ? [first] : [first, second];
+        }
+
+        function fetchJson(url) {
+            return fetch(url, { credentials: 'same-origin' }).then(function (res) {
+                debugLog('GET ' + url + ' -> HTTP ' + res.status);
+                if (!res.ok) throw new Error('HTTP ' + res.status + ' for ' + url);
+                return res.json().catch(function () {
+                    throw new Error('Invalid JSON for ' + url);
+                });
+            });
+        }
+
+        function fetchJsonWithFallback(candidates) {
+            var i = 0;
+            function tryNext(lastErr) {
+                if (i >= candidates.length) throw lastErr || new Error('No API candidate URLs left');
+                var url = candidates[i++];
+                debugLog('Trying API candidate: ' + url);
+                return fetchJson(url).catch(function (err) {
+                    debugLog('Candidate failed: ' + err.message);
+                    return tryNext(err);
+                });
+            }
+            return tryNext();
+        }
+
+        // --- ALL DOM ELEMENTS AT THE TOP ---
+        var shiftPills = document.querySelectorAll('.shift-pill');
+        var shiftHidden = document.getElementById('shift_hidden');
+        var startTimeInput = document.getElementById('start_time');
+        var endTimeInput = document.getElementById('end_time');
+        var operatorsContainer = document.getElementById('operators_container');
+        var addOperatorBtn = document.getElementById('add_operator_btn');
+        var supervisorsContainer = document.getElementById('supervisors_container');
+        var addSupervisorBtn = document.getElementById('add_supervisor_btn');
+        var toggleDowntimeBtn = document.getElementById('toggleDowntimeBtn');
+        var downtimeSection = document.getElementById('downtimeSection');
+        var downtimeContainer = document.getElementById('downtime_container');
+        var addMoreDowntime = document.getElementById('addMoreDowntime');
+        var totalDtDisplay = document.getElementById('total_planned_downtime_display');
+        var totalDtHidden = document.getElementById('total_planned_dt_hidden');
+        var totalRuntimeInput = document.getElementById('total_time_taken_minutes');
+        var prodForm = document.getElementById('productionEntryForm');
+        var forceSubmitBtn = document.getElementById('forceSubmitBtn');
+        var customerSelect = document.getElementById('customer_id');
+        var sectionSelect = document.getElementById('section_id');
+        var clSelect = document.getElementById('cl_id');
+        var machineSelect = document.getElementById('machine_id');
+        var operationSelect = document.getElementById('operation_type_id');
+        var idealTimeInput = document.getElementById('ideal_cycle_time');
+        var totalIdealInput = document.getElementById('total_ideal_time_minutes');
+        var actualQtyInput = document.getElementById('actual_quantity');
+        var plannedQtyInput = document.getElementById('planned_quantity');
+        var confirmModalEl = document.getElementById('confirmNoDowntimeModal');
+        var confirmModal = (confirmModalEl && window.bootstrap && window.bootstrap.Modal)
+            ? new window.bootstrap.Modal(confirmModalEl)
+            : null;
+
+        var downtimeReasons = [];
+
+        // --- SHIFT SELECTOR ---
+        function setShiftDefaults() {
+            var shiftVal = shiftHidden ? shiftHidden.value : "";
+            var shifts = (shiftVal || "").split(',').map(function (s) { return s.trim(); }).filter(function (s) { return s !== ""; });
+
+            if (shifts.length === 0) return;
+
+            shifts.sort();
+            var firstShift = shifts[0];
+            var lastShift = shifts[shifts.length - 1];
+
+            var now = new Date();
+            var baseDate = new Date(now.getTime());
+            if (now.getHours() < 6) {
+                baseDate.setDate(now.getDate() - 1);
+            }
+
+            var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+            var dateStr = baseDate.getFullYear() + '-' + pad(baseDate.getMonth() + 1) + '-' + pad(baseDate.getDate());
+
+            var getShiftTime = function (shift, type) {
+                var d = new Date(baseDate.getTime());
+                if (shift === 'A') {
+                    if (type === 'start') d.setHours(6, 1, 0, 0);
+                    else d.setHours(14, 0, 0, 0);
+                } else if (shift === 'B') {
+                    if (type === 'start') d.setHours(14, 1, 0, 0);
+                    else d.setHours(22, 0, 0, 0);
+                } else if (shift === 'C') {
+                    if (type === 'start') {
+                        d.setHours(22, 1, 0, 0);
+                    } else {
+                        d.setHours(6, 0, 0, 0);
+                        d.setDate(d.getDate() + 1);
+                    }
+                }
+                return d;
+            }
+
+            var start = getShiftTime(firstShift, 'start');
+            var end = getShiftTime(lastShift, 'end');
+
+            var toLocalISO = function (date) {
+                var y = date.getFullYear();
+                var m = pad(date.getMonth() + 1);
+                var d = pad(date.getDate());
+                var h = pad(date.getHours());
+                var min = pad(date.getMinutes());
+                return y + '-' + m + '-' + d + 'T' + h + ':' + min;
+            };
+
+            startTimeInput.value = toLocalISO(start);
+            endTimeInput.value = toLocalISO(end);
+            var prodDateHidden = document.getElementById('production_date_hidden');
+            if (prodDateHidden) prodDateHidden.value = dateStr;
+
+            updateAllOperatorTimes();
+            updateAllSupervisorTimes();
+        }
+
+        shiftPills.forEach(function (pill) {
+            pill.addEventListener('click', function () {
+                this.classList.toggle('active');
+                if (this.classList.contains('active')) {
+                    this.classList.remove('btn-outline-primary');
+                    this.classList.add('btn-primary');
+                } else {
+                    this.classList.add('btn-outline-primary');
+                    this.classList.remove('btn-primary');
+                }
+
+                var activePillElements = document.querySelectorAll('.shift-pill.active');
+                var activeShifts = [];
+                for (var i = 0; i < activePillElements.length; i++) {
+                    activeShifts.push(activePillElements[i].dataset.shift);
+                }
+                shiftHidden.value = activeShifts.join(', ');
+                setShiftDefaults();
+                calculateTotalDowntime();
+            });
+        });
+
+        // Function to select specific shift(s) programmatically
+        function toggleShiftPill(shiftCode, shouldBeActive) {
+            var pill = document.querySelector('.shift-pill[data-shift="' + shiftCode + '"]');
+            if (!pill) return;
+
+            var currentlyActive = pill.classList.contains('active');
+            if (currentlyActive !== shouldBeActive) {
+                pill.classList.toggle('active', shouldBeActive);
+                if (shouldBeActive) {
+                    pill.classList.remove('btn-outline-primary');
+                    pill.classList.add('btn-primary');
+                } else {
+                    pill.classList.add('btn-outline-primary');
+                    pill.classList.remove('btn-primary');
+                }
+
+                var activePillElements = document.querySelectorAll('.shift-pill.active');
+                var activeShifts = [];
+                for (var i = 0; i < activePillElements.length; i++) {
+                    activeShifts.push(activePillElements[i].dataset.shift);
+                }
+                shiftHidden.value = activeShifts.join(', ');
+                setShiftDefaults();
+                calculateTotalDowntime();
+            }
+        }
+
+        // Auto-select shift on load if present
+        var initShift = "{{ current_shift if current_shift else '' }}";
+        if (initShift && !shiftHidden.value) {
+            toggleShiftPill(initShift, true);
+        }
+
+        // --- OPERATOR LOGIC ---
+        function updateAllOperatorTimes() {
+            document.querySelectorAll('.op-start-time').forEach(function (input) { input.value = startTimeInput.value; });
+            document.querySelectorAll('.op-end-time').forEach(function (input) { input.value = endTimeInput.value; });
+            calculateAvailableRuntime();
+        }
+
+        startTimeInput.addEventListener('change', function () {
+            updateAllOperatorTimes();
+            updateAllSupervisorTimes();
+            updateShiftsFromTimeRange();
+        });
+        endTimeInput.addEventListener('change', function () {
+            updateAllOperatorTimes();
+            updateAllSupervisorTimes();
+            updateShiftsFromTimeRange();
+        });
+
+        function updateShiftsFromTimeRange() {
+            var start = new Date(startTimeInput.value);
+            var end = new Date(endTimeInput.value);
+            if (isNaN(start.getTime()) || isNaN(end.getTime())) return;
+            if (start >= end) return;
+
+            var shiftsToSelect = { 'A': false, 'B': false, 'C': false };
+            var current = new Date(start.getTime());
+
+            // Check every 30 mins between start and end to see which shifts are touched
+            while (current < end) {
+                var hr = current.getHours();
+                if (hr >= 6 && hr < 14) shiftsToSelect['A'] = true;
+                else if (hr >= 14 && hr < 22) shiftsToSelect['B'] = true;
+                else shiftsToSelect['C'] = true;
+                current.setMinutes(current.getMinutes() + 30);
+            }
+            // Check end boundary
+            var endHr = new Date(end.getTime() - 1000).getHours(); // 1 sec before end
+            if (endHr >= 6 && endHr < 14) shiftsToSelect['A'] = true;
+            else if (endHr >= 14 && endHr < 22) shiftsToSelect['B'] = true;
+            else shiftsToSelect['C'] = true;
+
+            // Apply without triggering setShiftDefaults to avoid circular snap
+            ['A', 'B', 'C'].forEach(function (s) {
+                var pill = document.querySelector('.shift-pill[data-shift="' + s + '"]');
+                if (!pill) return;
+                var shouldBeActive = shiftsToSelect[s];
+                var currentlyActive = pill.classList.contains('active');
+
+                if (currentlyActive !== shouldBeActive) {
+                    pill.classList.toggle('active', shouldBeActive);
+                    if (shouldBeActive) {
+                        pill.classList.remove('btn-outline-primary');
+                        pill.classList.add('btn-primary');
+                    } else {
+                        pill.classList.add('btn-outline-primary');
+                        pill.classList.remove('btn-primary');
+                    }
+                }
+            });
+
+            // Re-sync hidden input
+            var activePills = document.querySelectorAll('.shift-pill.active');
+            var activeShifts = [];
+            for (var i = 0; i < activePills.length; i++) {
+                activeShifts.push(activePills[i].dataset.shift);
+            }
+            shiftHidden.value = activeShifts.join(', ');
+        }
+
+        function setupOperatorRow(row) {
+            var codeInput = row.querySelector('.operator-code');
+            var nameDisplay = row.querySelector('.operator-name-display');
+            var idHidden = row.querySelector('.operator-id-hidden');
+            var startInput = row.querySelector('.op-start-time');
+            var endInput = row.querySelector('.op-end-time');
+            var removeBtn = row.querySelector('.remove-operator');
+
+            startInput.value = startTimeInput.value;
+            endInput.value = endTimeInput.value;
+
+            codeInput.addEventListener('blur', function () {
+                var val = this.value.trim();
+                if (!val) return;
+                nameDisplay.value = 'Searching...';
+                fetch('/rejection/api/employee/' + val)
+                    .then(function (res) {
+                        return res.json();
+                    })
+                    .then(function (data) {
+                        if (data.success) {
+                            nameDisplay.value = data.emp_name;
+                            idHidden.value = data.emp_id;
+                            nameDisplay.classList.remove('is-invalid');
+                        } else {
+                            throw new Error('Not found');
+                        }
+                    })
+                    .catch(function (e) {
+                        nameDisplay.value = 'Not found';
+                        idHidden.value = '';
+                        nameDisplay.classList.add('is-invalid');
+                    });
+            });
+
+            if (removeBtn) {
+                removeBtn.addEventListener('click', function () {
+                    if (document.querySelectorAll('.operator-row').length > 1) row.remove();
+                });
+            }
+        }
+
+        addOperatorBtn.addEventListener('click', function () {
+            var firstRow = document.querySelector('.operator-row');
+            var newRow = firstRow.cloneNode(true);
+            newRow.querySelector('.operator-code').value = '';
+            newRow.querySelector('.operator-name-display').value = '';
+            newRow.querySelector('.operator-name-display').classList.remove('is-invalid');
+            newRow.querySelector('.operator-id-hidden').value = '';
+            newRow.querySelector('.remove-operator').style.display = 'block';
+            operatorsContainer.appendChild(newRow);
+            setupOperatorRow(newRow);
+        });
+
+        setupOperatorRow(document.querySelector('.operator-row'));
+
+        // --- SUPERVISOR LOGIC ---
+        function updateAllSupervisorTimes() {
+            document.querySelectorAll('.sup-start-time').forEach(function (input) { input.value = startTimeInput.value; });
+            document.querySelectorAll('.sup-end-time').forEach(function (input) { input.value = endTimeInput.value; });
+        }
+
+        function setupSupervisorRow(row) {
+            var codeInput = row.querySelector('.supervisor-code');
+            var nameDisplay = row.querySelector('.supervisor-name-display');
+            var idHidden = row.querySelector('.supervisor-id-hidden');
+            var startInput = row.querySelector('.sup-start-time');
+            var endInput = row.querySelector('.sup-end-time');
+            var removeBtn = row.querySelector('.remove-supervisor');
+
+            startInput.value = startTimeInput.value;
+            endInput.value = endTimeInput.value;
+
+            codeInput.addEventListener('blur', function () {
+                var val = this.value.trim();
+                if (!val) return;
+                nameDisplay.value = 'Searching...';
+                fetch('/rejection/api/employee/' + val)
+                    .then(function (res) {
+                        return res.json();
+                    })
+                    .then(function (data) {
+                        if (data.success) {
+                            nameDisplay.value = data.emp_name;
+                            idHidden.value = data.emp_id;
+                            nameDisplay.classList.remove('is-invalid');
+                        } else {
+                            throw new Error('Not found');
+                        }
+                    })
+                    .catch(function (e) {
+                        nameDisplay.value = 'Not found';
+                        idHidden.value = '';
+                        nameDisplay.classList.add('is-invalid');
+                    });
+            });
+
+            if (removeBtn) {
+                removeBtn.addEventListener('click', function () {
+                    if (document.querySelectorAll('.supervisor-row').length > 1) row.remove();
+                });
+            }
+        }
+
+        addSupervisorBtn.addEventListener('click', function () {
+            var firstRow = document.querySelector('.supervisor-row');
+            var newRow = firstRow.cloneNode(true);
+            newRow.querySelector('.supervisor-code').value = '';
+            newRow.querySelector('.supervisor-name-display').value = '';
+            newRow.querySelector('.supervisor-name-display').classList.remove('is-invalid');
+            newRow.querySelector('.supervisor-id-hidden').value = '';
+            newRow.querySelector('.remove-supervisor').style.display = 'block';
+            supervisorsContainer.appendChild(newRow);
+            setupSupervisorRow(newRow);
+        });
+
+        setupSupervisorRow(document.querySelector('.supervisor-row'));
+
+        // --- DOWNTIME LOGIC ---
+        function loadDowntimeReasons() {
+            fetchJsonWithFallback(apiCandidates('/master/api/downtime-reasons'))
+                .then(function (data) {
+                    if (data) {
+                        downtimeReasons = data;
+                        updateDowntimeDropdowns();
+                    }
+                })
+                .catch(function (e) {
+                    console.error("Error loading downtime reasons:", e);
+                });
+        }
+
+        function updateDowntimeDropdowns() {
+            document.querySelectorAll('.downtime-reason').forEach(function (select) {
+                if (select.options.length > 1) return;
+                downtimeReasons.forEach(function (r) {
+                    var opt = document.createElement('option');
+                    opt.value = r.id;
+                    opt.textContent = r.reason_name;
+                    select.appendChild(opt);
+                });
+            });
+        }
+
+        toggleDowntimeBtn.addEventListener('click', function () {
+            downtimeSection.style.display = downtimeSection.style.display === 'none' ? 'block' : 'none';
+            if (downtimeSection.style.display === 'block' && downtimeReasons.length === 0) {
+                loadDowntimeReasons();
+            }
+        });
+
+        addMoreDowntime.addEventListener('click', function () {
+            var template = document.getElementById('downtime_row_template');
+            var firstRow = template.querySelector('.downtime-row');
+            var newRow = firstRow.cloneNode(true);
+            newRow.querySelector('.downtime-duration').value = '';
+            newRow.querySelector('.downtime-reason').value = '';
+            downtimeContainer.appendChild(newRow);
+
+            updateDowntimeDropdowns(); // Ensure dropdowns are filled
+
+            newRow.querySelector('.remove-downtime').addEventListener('click', function () {
+                this.closest('.downtime-row').remove();
+                calculateTotalDowntime();
+            });
+        });
+
+        // Delegate remove event for initial row and subsequent rows
+        downtimeContainer.addEventListener('click', function (e) {
+            if (e.target.closest('.remove-downtime')) {
+                var rows = document.querySelectorAll('.downtime-row');
+                // We allow deleting all rows now because addMoreDowntime uses a template
+                e.target.closest('.downtime-row').remove();
+                calculateTotalDowntime();
+            }
+        });
+
+        // Shift durations in minutes
+        const SHIFT_MINUTES = { 'A': 480, 'B': 480, 'C': 480 };
+
+        function getTotalShiftMinutes() {
+            var shifts = shiftHidden.value.split(',').map(function (s) { return s.trim(); }).filter(function (s) { return s; });
+            var total = 0;
+            for (var i = 0; i < shifts.length; i++) {
+                total += (SHIFT_MINUTES[shifts[i]] || 0);
+            }
+            return total;
+        }
+
+        function calculateTotalDowntime() {
+            var shiftCount = shiftHidden.value.split(',').filter(function (s) { return s.trim(); }).length || 1;
+            var baseFixedDt = parseInt(document.getElementById('base_fixed_downtime').value) || 0;
+            var fixedDt = shiftCount * baseFixedDt;
+
+            var extraDt = 0;
+            document.querySelectorAll('.downtime-duration').forEach(function (input) {
+                extraDt += (parseInt(input.value) || 0);
+            });
+
+            var total = fixedDt + extraDt;
+            totalDtDisplay.textContent = total;
+            totalDtHidden.value = total;
+            calculateAvailableRuntime();
+        }
+
+        function calculateAvailableRuntime() {
+            var totalShiftMins = getTotalShiftMinutes();
+            document.getElementById('total_shift_minutes').value = totalShiftMins;
+
+            var totalPlannedDt = parseInt(totalDtHidden.value) || 0;
+            var breakdown = 0;
+            var totalDowntime = totalPlannedDt + breakdown;
+            document.getElementById('total_downtime_minutes').value = totalDowntime;
+
+            var availableMins = totalShiftMins - totalDowntime;
+            totalRuntimeInput.value = availableMins > 0 ? availableMins : 0;
+
+            // Recalculate unaccounted time whenever available hours change
+            calculateUnaccountedTime();
+        }
+
+        document.addEventListener('input', function (e) {
+            if (e.target.classList.contains('downtime-duration')) {
+                calculateTotalDowntime();
+            }
+        });
+        document.addEventListener('change', function (e) {
+            if (e.target.classList.contains('downtime-duration')) {
+                calculateTotalDowntime();
+            }
+        });
+
+        calculateTotalDowntime();
+        calculateAvailableRuntime();
+
+        // --- SUBMISSION LOGIC ---
+        var overlapModalEl = document.getElementById('overlapConflictModal');
+        var overlapModal = (overlapModalEl && window.bootstrap && window.bootstrap.Modal)
+            ? new window.bootstrap.Modal(overlapModalEl)
+            : null;
+        function validateIdealVsAvailableForSubmit() {
+            var availableEl = document.getElementById('total_time_taken_minutes');
+            var idealEl = document.getElementById('total_ideal_time_minutes');
+            var available = parseFloat(availableEl && availableEl.value) || 0;
+            var ideal = parseFloat(idealEl && idealEl.value) || 0;
+            if (ideal > available) {
+                alert('Total Ideal Time (Mins) cannot be more than Total Available Machine Hours. Please check both fields.');
+                if (idealEl) idealEl.focus();
+                return false;
+            }
+            return true;
+        }
+
+        // Legacy submit handler removed; fallback submit flow below is the single source of truth.
+
+        // --- MASTER DATA FLOWS (Rebuilt from scratch) ---
+        function clearSelect(selectEl, placeholder) {
+            selectEl.innerHTML = '';
+            if (placeholder !== null) {
+                selectEl.add(new Option(placeholder, ''));
+            }
+        }
+
+        function notifyOperationChanged() {
+            if (window.jQuery && $(operationSelect).data('select2')) {
+                $(operationSelect).trigger('change');
+            } else {
+                operationSelect.dispatchEvent(new Event('change'));
+            }
+        }
+
+        function loadAllOperations(withInfoMessage) {
+            return fetchJsonWithFallback(apiCandidates('/master/api/operations'))
+                .then(function (allOps) {
+                    debugLog('Loaded fallback all operations count=' + (allOps ? allOps.length : 0));
+                    clearSelect(operationSelect, null);
+                    if (withInfoMessage) {
+                        var info = new Option(withInfoMessage, '');
+                        info.disabled = true;
+                        operationSelect.add(info);
+                    }
+                    allOps.forEach(function (op) {
+                        var opt = new Option(op.name, op.id);
+                        opt.dataset.seconds = '';
+                        operationSelect.add(opt);
+                    });
+                    document.getElementById('no_cycle_time_flag').value = '1';
+                    idealTimeInput.value = '';
+                    idealTimeInput.setAttribute('placeholder', 'N/A');
+                    totalIdealInput.value = '';
+                    totalIdealInput.setAttribute('placeholder', 'N/A');
+                    notifyOperationChanged();
+                });
+        }
+
+        function loadOperationsForSelectedCombo() {
+            var machineId = machineSelect.value;
+            var customerId = customerSelect.value;
+            var sectionId = sectionSelect.value;
+            var cutLengthId = clSelect.value;
+            debugLog('loadOperationsForSelectedCombo machine=' + machineId + ', customer=' + customerId + ', section=' + sectionId + ', cutLength=' + cutLengthId);
+
+            if (!machineId || !customerId || !sectionId || !cutLengthId) {
+                clearSelect(operationSelect, 'Select machine + customer + section + cut length first');
+                document.getElementById('no_cycle_time_flag').value = '1';
+                notifyOperationChanged();
+                return;
+            }
+
+            var cycleUrl = '/master/api/cycle-times?cl_id=' + encodeURIComponent(cutLengthId) +
+                '&machine_id=' + encodeURIComponent(machineId);
+
+            fetchJsonWithFallback(apiCandidates(cycleUrl))
+                .then(function (data) {
+                    var processes = (data && data.processes) ? data.processes : [];
+                    var mapped = processes.filter(function (p) { return !!p.operation_type_id; });
+                    debugLog('Cycle-time processes=' + processes.length + ', mapped operations=' + mapped.length);
+
+                    if (mapped.length === 0) {
+                        return loadAllOperations('No mapped process for selected combination. Showing all operations.');
+                    }
+
+                    clearSelect(operationSelect, null);
+                    var seen = {};
+                    mapped.forEach(function (p) {
+                        var key = p.operation_type_id + '|' + p.name;
+                        if (seen[key]) return;
+                        seen[key] = true;
+                        var opt = new Option(p.name, p.operation_type_id);
+                        opt.dataset.seconds = p.seconds || '';
+                        operationSelect.add(opt);
+                    });
+                    document.getElementById('no_cycle_time_flag').value = '';
+                    notifyOperationChanged();
+                })
+                .catch(function (err) {
+                    console.error('Error loading operation/process list:', err);
+                    return loadAllOperations('Could not fetch combination processes. Showing all operations.');
+                });
+        }
+
+        customerSelect.addEventListener('change', function () {
+            var cid = this.value;
+            debugLog('Customer changed -> ' + cid);
+            document.getElementById('section_number_hidden').value = '';
+            document.getElementById('cutlength_hidden').value = '';
+            clearSelect(sectionSelect, 'Loading sections...');
+            clearSelect(clSelect, 'Select section first');
+            clearSelect(operationSelect, 'Select section + cut length first');
+            if (!cid) {
+                clearSelect(sectionSelect, 'Select Customer First');
+                return;
+            }
+
+            fetchJsonWithFallback(apiCandidates('/master/api/sections/' + encodeURIComponent(cid)))
+                .then(function (sections) {
+                    debugLog('Sections loaded count=' + sections.length);
+                    clearSelect(sectionSelect, 'Select Section');
+                    sections.forEach(function (s) {
+                        sectionSelect.add(new Option(s.number, s.id));
+                    });
+                    if (sections.length > 0) {
+                        sectionSelect.selectedIndex = 1;
+                        sectionSelect.dispatchEvent(new Event('change'));
+                    } else {
+                        clearSelect(sectionSelect, 'No sections found');
+                    }
+                })
+                .catch(function (err) {
+                    console.error('Error loading sections:', err);
+                    clearSelect(sectionSelect, 'Failed to load sections');
+                });
+        });
+
+        sectionSelect.addEventListener('change', function () {
+            var sid = this.value;
+            debugLog('Section changed -> ' + sid);
+            document.getElementById('section_number_hidden').value = sid ? this.options[this.selectedIndex].text : '';
+            document.getElementById('cutlength_hidden').value = '';
+            clearSelect(clSelect, 'Loading cut lengths...');
+            clearSelect(operationSelect, 'Select cut length first');
+            if (!sid) {
+                clearSelect(clSelect, 'Select Section First');
+                return;
+            }
+
+            fetchJsonWithFallback(apiCandidates('/master/api/cut-lengths/' + encodeURIComponent(sid)))
+                .then(function (cutLengths) {
+                    debugLog('Cut lengths loaded count=' + cutLengths.length);
+                    clearSelect(clSelect, 'Select Cut Length');
+                    cutLengths.forEach(function (c) {
+                        clSelect.add(new Option(c.length + ' mm', c.id));
+                    });
+                    if (cutLengths.length > 0) {
+                        clSelect.selectedIndex = 1;
+                        clSelect.dispatchEvent(new Event('change'));
+                    } else {
+                        clearSelect(clSelect, 'No cut lengths found');
+                    }
+                })
+                .catch(function (err) {
+                    console.error('Error loading cut lengths:', err);
+                    clearSelect(clSelect, 'Failed to load cut lengths');
+                });
+        });
+
+        clSelect.addEventListener('change', function () {
+            debugLog('Cut length changed -> ' + this.value);
+            document.getElementById('cutlength_hidden').value = this.value
+                ? this.options[this.selectedIndex].text.replace(' mm', '')
+                : '';
+            loadOperationsForSelectedCombo();
+        });
+
+        machineSelect.addEventListener('change', function () {
+            debugLog('Machine changed -> ' + this.value);
+            loadOperationsForSelectedCombo();
+        });
+
+        clearSelect(sectionSelect, 'Select Customer First');
+        clearSelect(clSelect, 'Select Section First');
+        clearSelect(operationSelect, 'Select machine + customer + section + cut length first');
+        if (customerSelect.value) {
+            customerSelect.dispatchEvent(new Event('change'));
+        }
+
+        // Handle Select2 multiple changes
+        function onOperationChange() {
+            var noCycleTime = document.getElementById('no_cycle_time_flag').value;
+            if (noCycleTime === '1') {
+                idealTimeInput.value = '';
+                idealTimeInput.setAttribute('placeholder', 'N/A');
+                totalIdealInput.value = '';
+                totalIdealInput.setAttribute('placeholder', 'N/A');
+                document.getElementById('total_unaccounted_time').value = '';
+                document.getElementById('total_unaccounted_time').setAttribute('placeholder', 'N/A');
+                calculateIdealTotal();
+                return;
+            }
+            var totalSec = 0;
+            for (var i = 0; i < this.options.length; i++) {
+                if (this.options[i].selected && this.options[i].dataset.seconds) {
+                    totalSec += parseFloat(this.options[i].dataset.seconds);
+                }
+            }
+            // Store as minutes for display
+            var totalMins = (totalSec / 60);
+            idealTimeInput.value = totalMins > 0 ? totalMins.toFixed(2) : 0;
+            calculateIdealTotal();
+        }
+        if (window.jQuery) {
+            $(operationSelect).on('change', onOperationChange);
+        } else {
+            operationSelect.addEventListener('change', onOperationChange);
+        }
+
+        function calculateIdealTotal() {
+            var actual = parseFloat(actualQtyInput.value) || 0;
+            var planned = parseFloat(plannedQtyInput.value) || 0;
+
+            // Production Miss calculation should always run
+            document.getElementById('production_miss').value = planned - actual;
+
+            var noCycleTime = document.getElementById('no_cycle_time_flag').value;
+            if (noCycleTime === '1') {
+                totalIdealInput.value = '';
+                totalIdealInput.setAttribute('placeholder', 'N/A');
+                calculateUnaccountedTime();
+                calculateOEE();
+                return;
+            }
+
+            // idealTimeInput now holds minutes per piece
+            var idealMinsPerPc = parseFloat(idealTimeInput.value) || 0;
+            totalIdealInput.value = (actual * idealMinsPerPc).toFixed(1);
+
+            calculateUnaccountedTime();
+            calculateOEE();
+        }
+
+        function calculateUnaccountedTime() {
+            var available = parseFloat(totalRuntimeInput.value) || 0;
+            var idealUsed = parseFloat(totalIdealInput.value) || 0;
+            if (document.getElementById('no_cycle_time_flag').value === '1') {
+                document.getElementById('total_unaccounted_time').setAttribute('placeholder', 'N/A');
+                document.getElementById('total_unaccounted_time').value = '';
+                return;
+            }
+            var unaccounted = available - idealUsed;
+            document.getElementById('total_unaccounted_time').value = unaccounted.toFixed(1);
+        }
+
+        actualQtyInput.addEventListener('input', function () {
+            calculateIdealTotal();
+            calculateOEE();
+        });
+        plannedQtyInput.addEventListener('input', function () {
+            calculateIdealTotal();
+            calculateOEE();
+        });
+
+        function calculateOEE() {
+            var planned = parseFloat(plannedQtyInput.value) || 0;
+            var actual = parseFloat(actualQtyInput.value) || 0;
+            var shiftMins = getTotalShiftMinutes() || 0;
+            var downtime = parseFloat(document.getElementById('total_downtime_minutes').value) || 0;
+            var idealMinsPerPc = parseFloat(idealTimeInput.value) || 0;
+
+            // 1. Efficiency (Simple Output/Plan)
+            var efficiency = planned > 0 ? (actual / planned) * 100 : 0;
+            updateMetric('sidebarEff', efficiency);
+
+            // 2. Availability (Actually available / Planned available)
+            var availability = shiftMins > 0 ? ((shiftMins - downtime) / shiftMins) * 100 : 0;
+            updateMetric('sidebarAvail', availability);
+
+            // 3. Performance (Ideal time for actual output / Actual runtime)
+            var actualRuntime = shiftMins - downtime;
+            var performance = (actualRuntime > 0 && idealMinsPerPc > 0) ? ((actual * idealMinsPerPc) / actualRuntime) * 100 : efficiency;
+            updateMetric('sidebarPerf', performance);
+
+            // 4. Quality (Assuming self-rejection is captured)
+            var selfRej = parseFloat(document.getElementById('self_rejection_qty').value) || 0;
+            var quality = actual > 0 ? ((actual - selfRej) / actual) * 100 : 100;
+
+            // 5. OEE = A * P * Q
+            var oee = (availability / 100) * (performance / 100) * (quality / 100) * 100;
+            if (oee > 100) oee = 100;
+            if (oee < 0) oee = 0;
+
+            updateOeeGauges(oee);
+            updateInsights(efficiency, oee);
+        }
+        window.__msCalculateOEE = calculateOEE;
+
+        function updateMetric(idPrefix, value) {
+            if (value > 100) value = 100;
+            document.getElementById(idPrefix + 'Value').textContent = Math.round(value) + '%';
+            document.getElementById(idPrefix + 'Bar').style.width = value + '%';
+        }
+
+        function updateOeeGauges(value) {
+            var dashArray = (value / 100) * 126; // 126 is approx half-circumference
+            var colorClass = 'status-red';
+            var statusText = 'Significant Improvement';
+            var badgeClass = 'bg-danger';
+
+            if (value >= 85) {
+                colorClass = 'status-green';
+                statusText = 'World Class Performance';
+                badgeClass = 'bg-success';
+            } else if (value >= 60) {
+                colorClass = 'status-yellow';
+                statusText = 'Average / Improving';
+                badgeClass = 'bg-warning text-dark';
+            }
+
+            // Update Header Gauge
+            var hPath = document.getElementById('headerOeePath');
+            if (hPath) {
+                hPath.setAttribute('stroke-dasharray', dashArray + ', 126');
+                hPath.className.baseVal = 'gauge-fill ' + colorClass;
+                document.getElementById('headerOeeText').textContent = Math.round(value) + '%';
+            }
+
+            // Update Sidebar Gauge
+            var sPath = document.getElementById('sidebarOeePath');
+            if (sPath) {
+                sPath.setAttribute('stroke-dasharray', dashArray + ', 126');
+                sPath.className.baseVal = 'gauge-fill ' + colorClass;
+                document.getElementById('sidebarOeeText').textContent = Math.round(value) + '%';
+            }
+
+            var badge = document.getElementById('oeeStatusBadge');
+            if (badge) {
+                badge.textContent = statusText;
+                badge.className = 'badge rounded-pill px-3 py-2 ' + badgeClass;
+            }
+        }
+
+        function updateInsights(eff, oee) {
+            var insight = document.getElementById('sidebarInsight');
+            if (oee >= 85) {
+                insight.className = 'alert alert-success border-0 small mb-0';
+                insight.innerHTML = '<i class="fas fa-check-circle me-1"></i> Excellent performance! Keep it up.';
+            } else if (oee < 60 && oee > 0) {
+                insight.className = 'alert alert-danger border-0 small mb-0';
+                insight.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i> High downtime or slow cycle time detected.';
+            } else {
+                insight.className = 'alert alert-soft-primary border-0 small mb-0';
+                insight.innerHTML = '<i class="fas fa-info-circle me-1"></i> Tracking performance in real-time.';
+            }
+        }
+
+        // Initialize OEE on load
+        setTimeout(calculateOEE, 500);
+
+        // Add event listeners for other fields affecting OEE
+        document.getElementById('total_downtime_minutes').addEventListener('change', calculateOEE);
+        document.getElementById('total_downtime_minutes').addEventListener('input', calculateOEE);
+        document.getElementById('self_rejection_qty').addEventListener('input', calculateOEE);
+        startTimeInput.addEventListener('change', calculateOEE);
+        endTimeInput.addEventListener('change', calculateOEE);
+        operationSelect.addEventListener('change', calculateOEE);
+        shiftPills.forEach(function (pill) { pill.addEventListener('click', function () { setTimeout(calculateOEE, 0); }); });
+
+        // Custom event for when downtime is calculated programmatically
+        var originalCalcDt = calculateTotalDowntime;
+        calculateTotalDowntime = function () {
+            originalCalcDt();
+            calculateOEE();
+        };
+
+        // Fix for linting errors in existing scripts (if any)
+    })();
+</script>
+<script>
+    (function () {
+        if (window.__msDropdownFallbackBootstrapped) return;
+        window.__msDropdownFallbackBootstrapped = true;
+
+        function byId(id) { return document.getElementById(id); }
+        var shed = byId('shed_id');
+        var customer = byId('customer_id');
+        var section = byId('section_id');
+        var cutLength = byId('cl_id');
+        var machine = byId('machine_id');
+        var operation = byId('operation_type_id');
+        var sectionHidden = byId('section_number_hidden');
+        var cutLengthHidden = byId('cutlength_hidden');
+        var noCycleFlag = byId('no_cycle_time_flag');
+        // Debug panel removed.
+        var logBox = null;
+        var operatorsContainer = byId('operators_container');
+        var supervisorsContainer = byId('supervisors_container');
+        var addOperatorBtn = byId('add_operator_btn');
+        var addSupervisorBtn = byId('add_supervisor_btn');
+        var startTimeInput = byId('start_time');
+        var endTimeInput = byId('end_time');
+        var plannedQty = byId('planned_quantity');
+        var actualOkQty = byId('actual_quantity');
+        var idealCyclePerPc = byId('ideal_cycle_time');
+        var totalIdealMins = byId('total_ideal_time_minutes');
+        var totalUnaccountedMins = byId('total_unaccounted_time');
+        var prodMiss = byId('production_miss');
+        var toggleDowntimeBtn = byId('toggleDowntimeBtn');
+        var downtimeSection = byId('downtimeSection');
+        var downtimeContainer = byId('downtime_container');
+        var addMoreDowntimeBtn = byId('addMoreDowntime');
+        var downtimeRowTemplate = byId('downtime_row_template');
+        var totalPlannedDtDisplay = byId('total_planned_downtime_display');
+        var totalPlannedDtHidden = byId('total_planned_dt_hidden');
+        var baseFixedDowntime = byId('base_fixed_downtime');
+        var totalShiftMinsInput = byId('total_shift_minutes');
+        var totalDowntimeMins = byId('total_downtime_minutes');
+        var totalRuntimeMins = byId('total_time_taken_minutes');
+        var shiftHidden = byId('shift_hidden');
+        var selfRejectionContainer = byId('self_rejection_container');
+        var selfRejectionRowTemplate = byId('self_rejection_row_template');
+        var addSelfRejectionRowBtn = byId('addSelfRejectionRowBtn');
+        var selfRejectionQtyInput = byId('self_rejection_qty');
+        var selfRejectionWeightInput = byId('self_rejection_weight_per_pcs');
+        var machiningScrapKgInput = byId('total_machining_scrap_kg');
+        var selfRejectionTotalPcs = byId('self_rejection_total_pcs');
+        var selfRejectionTotalAllKgInput = byId('self_rejection_total_all_kg');
+        var selfRejectionTotalKgInput = byId('self_rejection_total_kg');
+        var downtimeReasonsCache = [];
+        var prodForm = byId('productionEntryForm');
+        var forceSubmitBtn = byId('forceSubmitBtn');
+        var overlapModalEl = byId('overlapConflictModal');
+        var confirmNoDowntimeModalEl = byId('confirmNoDowntimeModal');
+        var conflictDetailsBody = byId('conflictDetailsBody');
+
+        if (!customer || !section || !cutLength || !machine || !operation) return;
+
+        function validateIdealVsAvailableForSubmit() {
+            var available = safeNum(totalRuntimeMins && totalRuntimeMins.value);
+            var ideal = safeNum(totalIdealMins && totalIdealMins.value);
+            if (ideal > available) {
+                alert('Total Ideal Time (Mins) cannot be more than Total Available Machine Hours. Please check both fields.');
+                if (totalIdealMins) totalIdealMins.focus();
+                return false;
+            }
+            return true;
+        }
+
+        function safeNum(v) {
+            var n = parseFloat(v);
+            return isNaN(n) ? 0 : n;
+        }
+
+        function updateSelfRejectionRemoveButtons() {
+            if (!selfRejectionContainer) return;
+            var rows = selfRejectionContainer.querySelectorAll('.self-rejection-row');
+            rows.forEach(function (row, index) {
+                var btn = row.querySelector('.remove-self-rejection-row');
+                if (btn) btn.style.display = rows.length > 1 ? '' : 'none';
+            });
+        }
+
+        function recalculateSelfRejectionSummary() {
+            var totalQty = 0;
+            if (selfRejectionContainer) {
+                selfRejectionContainer.querySelectorAll('.self-rejection-qty').forEach(function (input) {
+                    totalQty += safeNum(input.value);
+                });
+            }
+            var machiningScrapKg = safeNum(machiningScrapKgInput && machiningScrapKgInput.value);
+            var weightPerPc = safeNum(selfRejectionWeightInput && selfRejectionWeightInput.value);
+            if (selfRejectionQtyInput) selfRejectionQtyInput.value = totalQty;
+            if (selfRejectionTotalPcs) selfRejectionTotalPcs.value = totalQty;
+            var totalSelfRejectionKg = weightPerPc * totalQty;
+            if (selfRejectionTotalKgInput) selfRejectionTotalKgInput.value = totalSelfRejectionKg.toFixed(3);
+            if (selfRejectionTotalAllKgInput) selfRejectionTotalAllKgInput.value = (totalSelfRejectionKg + machiningScrapKg).toFixed(3);
+            updateSelfRejectionRemoveButtons();
+        }
+
+        function updateMetricFallback(idPrefix, value) {
+            if (value > 100) value = 100;
+            if (value < 0) value = 0;
+            var valueEl = byId(idPrefix + 'Value');
+            var barEl = byId(idPrefix + 'Bar');
+            if (valueEl) valueEl.textContent = Math.round(value) + '%';
+            if (barEl) barEl.style.width = value + '%';
+        }
+
+        function updateOeeGaugesFallback(value) {
+            if (value > 100) value = 100;
+            if (value < 0) value = 0;
+            var dashArray = (value / 100) * 126;
+            var colorClass = 'status-red';
+            var statusText = 'Significant Improvement';
+            var badgeClass = 'bg-danger';
+
+            if (value >= 85) {
+                colorClass = 'status-green';
+                statusText = 'World Class Performance';
+                badgeClass = 'bg-success';
+            } else if (value >= 60) {
+                colorClass = 'status-yellow';
+                statusText = 'Average / Improving';
+                badgeClass = 'bg-warning text-dark';
+            }
+
+            var hPath = byId('headerOeePath');
+            if (hPath) {
+                hPath.setAttribute('stroke-dasharray', dashArray + ', 126');
+                hPath.className.baseVal = 'gauge-fill ' + colorClass;
+            }
+            var hText = byId('headerOeeText');
+            if (hText) hText.textContent = Math.round(value) + '%';
+
+            var sPath = byId('sidebarOeePath');
+            if (sPath) {
+                sPath.setAttribute('stroke-dasharray', dashArray + ', 126');
+                sPath.className.baseVal = 'gauge-fill ' + colorClass;
+            }
+            var sText = byId('sidebarOeeText');
+            if (sText) sText.textContent = Math.round(value) + '%';
+
+            var badge = byId('oeeStatusBadge');
+            if (badge) {
+                badge.textContent = statusText;
+                badge.className = 'badge rounded-pill px-3 py-2 ' + badgeClass;
+            }
+        }
+
+        function updateInsightsFallback(eff, oee) {
+            var insight = byId('sidebarInsight');
+            if (!insight) return;
+            if (oee >= 85) {
+                insight.className = 'alert alert-success border-0 small mb-0';
+                insight.innerHTML = '<i class="fas fa-check-circle me-1"></i> Excellent performance! Keep it up.';
+            } else if (oee < 60 && oee > 0) {
+                insight.className = 'alert alert-danger border-0 small mb-0';
+                insight.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i> High downtime or slow cycle time detected.';
+            } else {
+                insight.className = 'alert alert-soft-primary border-0 small mb-0';
+                insight.innerHTML = '<i class="fas fa-info-circle me-1"></i> Tracking performance in real-time.';
+            }
+        }
+
+        function fallbackRecalculateOEE() {
+            var planned = safeNum(plannedQty && plannedQty.value);
+            var actual = safeNum(actualOkQty && actualOkQty.value);
+            var selfRejEl = byId('self_rejection_qty');
+            var selfRej = safeNum(selfRejEl && selfRejEl.value);
+            var shiftMins = safeNum(totalShiftMinsInput && totalShiftMinsInput.value);
+            var downtime = safeNum(totalDowntimeMins && totalDowntimeMins.value);
+            var runtime = safeNum(totalRuntimeMins && totalRuntimeMins.value);
+            var idealPerPc = safeNum(idealCyclePerPc && idealCyclePerPc.value);
+
+            var efficiency = planned > 0 ? (actual / planned) * 100 : 0;
+            var availability = shiftMins > 0 ? ((shiftMins - downtime) / shiftMins) * 100 : 0;
+            var performance = (runtime > 0 && idealPerPc > 0) ? ((actual * idealPerPc) / runtime) * 100 : efficiency;
+            var quality = actual > 0 ? ((actual - selfRej) / actual) * 100 : 100;
+
+            updateMetricFallback('sidebarEff', efficiency);
+            updateMetricFallback('sidebarAvail', availability);
+            updateMetricFallback('sidebarPerf', performance);
+
+            var oee = (availability / 100) * (performance / 100) * (quality / 100) * 100;
+            updateOeeGaugesFallback(oee);
+            updateInsightsFallback(efficiency, oee);
+        }
+
+        function triggerOeeRecalc() {
+            try {
+                if (typeof window.__msCalculateOEE === 'function') {
+                    window.__msCalculateOEE();
+                }
+            } catch (e) {
+                console.warn('Primary OEE recalculation failed. Using fallback.', e);
+            }
+            fallbackRecalculateOEE();
+        }
+
+        function log(msg) {
+            var line = '[' + new Date().toLocaleTimeString() + '] ' + msg;
+            if (window.MS_DROPDOWN_DEBUG === true) {
+                console.log('[MS-DROPDOWN-FALLBACK]', msg);
+            }
+            if (logBox) {
+                if (logBox.textContent.indexOf('Waiting for actions...') >= 0) logBox.textContent = '';
+                logBox.textContent += (logBox.textContent ? '\n' : '') + line;
+                logBox.scrollTop = logBox.scrollHeight;
+            }
+        }
+
+        function appBase() {
+            var form = byId('productionEntryForm');
+            if (!form || !form.action) return '';
+            var p = new URL(form.action, window.location.origin).pathname;
+            return p.replace(/\/production-entry\/?$/, '');
+        }
+
+        function candidates(path) {
+            var first = (appBase() + path).replace(/\/{2,}/g, '/');
+            return first === path ? [path] : [first, path];
+        }
+
+        function fetchJsonWithFallback(path) {
+            var urls = candidates(path);
+            var i = 0;
+            function next(lastErr) {
+                if (i >= urls.length) return Promise.reject(lastErr || new Error('No URL left'));
+                var url = urls[i++];
+                log('GET ' + url);
+                return fetch(url, { credentials: 'same-origin' })
+                    .then(function (res) {
+                        log('HTTP ' + res.status + ' for ' + url);
+                        if (!res.ok) throw new Error('HTTP ' + res.status);
+                        return res.json();
+                    })
+                    .catch(function (err) {
+                        return next(err);
+                    });
+            }
+            return next();
+        }
+
+        function fetchEmployeeByCode(empCode) {
+            return fetchJsonWithFallback('/rejection/api/employee/' + encodeURIComponent(empCode));
+        }
+
+        function resetSelect(sel, placeholder) {
+            sel.innerHTML = '';
+            if (placeholder !== null) sel.add(new Option(placeholder, ''));
+        }
+
+        function loadMachinesForShed(shedId, selectedMachineId) {
+            if (!machine) return Promise.resolve();
+            if (!shedId) {
+                resetSelect(machine, 'Select Shed First');
+                return Promise.resolve();
+            }
+            return fetchJsonWithFallback('/master/api/machines?status=Active&shed_id=' + encodeURIComponent(shedId))
+                .then(function (rows) {
+                    resetSelect(machine, 'Select Machine');
+                    (rows || []).forEach(function (m) {
+                        var opt = new Option(m.name, m.id);
+                        if (selectedMachineId && String(selectedMachineId) === String(m.id)) opt.selected = true;
+                        machine.add(opt);
+                    });
+                })
+                .catch(function (err) {
+                    log('Failed machine load: ' + err.message);
+                    resetSelect(machine, 'Failed to load machines');
+                });
+        }
+
+        function getSelectedShiftCount() {
+            var fromHidden = 0;
+            if (shiftHidden && shiftHidden.value) {
+                fromHidden = shiftHidden.value.split(',').map(function (s) { return s.trim(); }).filter(Boolean).length;
+            }
+            if (fromHidden > 0) return fromHidden;
+            var activePills = document.querySelectorAll('.shift-pill.active');
+            if (activePills && activePills.length > 0) return activePills.length;
+            return 0;
+        }
+
+        function getTotalShiftMinutesFallback() {
+            var shiftCount = getSelectedShiftCount();
+            if (shiftCount > 0) return shiftCount * 480;
+
+            if (startTimeInput && endTimeInput && startTimeInput.value && endTimeInput.value) {
+                var s = new Date(startTimeInput.value);
+                var e = new Date(endTimeInput.value);
+                if (!isNaN(s.getTime()) && !isNaN(e.getTime()) && e > s) {
+                    return Math.round((e - s) / 60000);
+                }
+            }
+            return 0;
+        }
+
+        function calculateFallbackDowntimeTotals() {
+            var shiftCount = getSelectedShiftCount();
+            var totalShiftMinutes = getTotalShiftMinutesFallback();
+            if (totalShiftMinsInput) totalShiftMinsInput.value = String(totalShiftMinutes);
+
+            var fixedBase = parseInt(baseFixedDowntime && baseFixedDowntime.value, 10) || 0;
+            var fixed = fixedBase * (shiftCount > 0 ? shiftCount : 1);
+
+            var extra = 0;
+            if (downtimeContainer) {
+                downtimeContainer.querySelectorAll('.downtime-duration').forEach(function (i) {
+                    extra += parseInt(i.value || '0', 10) || 0;
+                });
+            }
+            var total = fixed + extra;
+            if (totalPlannedDtDisplay) totalPlannedDtDisplay.textContent = String(total);
+            if (totalPlannedDtHidden) totalPlannedDtHidden.value = String(total);
+            if (totalDowntimeMins) totalDowntimeMins.value = String(total);
+
+            var available = Math.max(0, totalShiftMinutes - total);
+            if (totalRuntimeMins) totalRuntimeMins.value = String(available);
+            recalcIdealAndProdMiss();
+        }
+
+        function syncShiftHiddenFromPills() {
+            if (!shiftHidden) return;
+            var shifts = [];
+            document.querySelectorAll('.shift-pill.active').forEach(function (pill) {
+                var s = (pill.dataset.shift || '').trim();
+                if (s) shifts.push(s);
+            });
+            shiftHidden.value = shifts.join(', ');
+        }
+
+        function syncSupervisorTimes(forceAll) {
+            if (!supervisorsContainer) return;
+            var startVal = startTimeInput ? startTimeInput.value : '';
+            var endVal = endTimeInput ? endTimeInput.value : '';
+            supervisorsContainer.querySelectorAll('.supervisor-row').forEach(function (row) {
+                var s = row.querySelector('.sup-start-time');
+                var e = row.querySelector('.sup-end-time');
+                if (s && (forceAll || !s.value)) s.value = startVal;
+                if (e && (forceAll || !e.value)) e.value = endVal;
+            });
+            log('Supervisor times synced start=' + startVal + ' end=' + endVal);
+        }
+
+        function syncOperatorTimes(forceAll) {
+            if (!operatorsContainer) return;
+            var startVal = startTimeInput ? startTimeInput.value : '';
+            var endVal = endTimeInput ? endTimeInput.value : '';
+            operatorsContainer.querySelectorAll('.operator-row').forEach(function (row) {
+                var s = row.querySelector('.op-start-time');
+                var e = row.querySelector('.op-end-time');
+                if (s && (forceAll || !s.value)) s.value = startVal;
+                if (e && (forceAll || !e.value)) e.value = endVal;
+            });
+            log('Operator times synced start=' + startVal + ' end=' + endVal);
+        }
+
+        function addOperatorRowFallback() {
+            if (!operatorsContainer) return;
+            var first = operatorsContainer.querySelector('.operator-row');
+            if (!first) return;
+            var clone = first.cloneNode(true);
+            var code = clone.querySelector('.operator-code');
+            var name = clone.querySelector('.operator-name-display');
+            var hid = clone.querySelector('.operator-id-hidden');
+            var s = clone.querySelector('.op-start-time');
+            var e = clone.querySelector('.op-end-time');
+            var rm = clone.querySelector('.remove-operator');
+            if (code) code.value = '';
+            if (name) {
+                name.value = '';
+                name.classList.remove('is-invalid');
+            }
+            if (hid) hid.value = '';
+            if (s) s.value = startTimeInput ? startTimeInput.value : '';
+            if (e) e.value = endTimeInput ? endTimeInput.value : '';
+            if (rm) rm.style.display = 'block';
+            operatorsContainer.appendChild(clone);
+            log('Added operator row');
+        }
+
+        function addSupervisorRowFallback() {
+            if (!supervisorsContainer) return;
+            var first = supervisorsContainer.querySelector('.supervisor-row');
+            if (!first) return;
+            var clone = first.cloneNode(true);
+            var code = clone.querySelector('.supervisor-code');
+            var name = clone.querySelector('.supervisor-name-display');
+            var hid = clone.querySelector('.supervisor-id-hidden');
+            var s = clone.querySelector('.sup-start-time');
+            var e = clone.querySelector('.sup-end-time');
+            var rm = clone.querySelector('.remove-supervisor');
+            if (code) code.value = '';
+            if (name) {
+                name.value = '';
+                name.classList.remove('is-invalid');
+            }
+            if (hid) hid.value = '';
+            if (s) s.value = startTimeInput ? startTimeInput.value : '';
+            if (e) e.value = endTimeInput ? endTimeInput.value : '';
+            if (rm) rm.style.display = 'block';
+            supervisorsContainer.appendChild(clone);
+            log('Added supervisor row');
+        }
+
+        function populateDowntimeReasonSelects() {
+            if (!downtimeContainer) return;
+            var selects = downtimeContainer.querySelectorAll('.downtime-reason');
+            selects.forEach(function (sel) {
+                var current = sel.value;
+                sel.innerHTML = '<option value="">Select Reason (NPD, Setup...)</option>';
+                downtimeReasonsCache.forEach(function (r) {
+                    sel.add(new Option(r.reason_name, r.id));
+                });
+                if (current) sel.value = current;
+            });
+            log('Populated downtime reason dropdowns count=' + downtimeReasonsCache.length);
+        }
+
+        function loadDowntimeReasonsFallback() {
+            return fetchJsonWithFallback('/master/api/downtime-reasons')
+                .then(function (rows) {
+                    downtimeReasonsCache = rows || [];
+                    populateDowntimeReasonSelects();
+                    log('Downtime reasons loaded=' + downtimeReasonsCache.length);
+                })
+                .catch(function (err) {
+                    log('Failed downtime reasons load: ' + err.message);
+                });
+        }
+
+        function ensureConflictEditButton(entryId) {
+            if (!overlapModalEl) return;
+            var footer = overlapModalEl.querySelector('.modal-footer .w-100');
+            if (!footer) return;
+            var btn = byId('fallbackConflictEditBtn');
+            if (!btn) {
+                btn = document.createElement('button');
+                btn.id = 'fallbackConflictEditBtn';
+                btn.type = 'button';
+                btn.className = 'btn btn-primary rounded-pill px-4 me-2';
+                btn.textContent = 'Open Existing Entry';
+                footer.insertBefore(btn, footer.firstChild);
+            }
+            btn.onclick = function () {
+                var base = appBase();
+                var editUrl = (base ? base : '') + '/entry/' + entryId + '/edit';
+                window.location.href = editUrl;
+            };
+        }
+
+        function recalcIdealAndProdMiss() {
+            var planned = parseFloat(plannedQty && plannedQty.value) || 0;
+            var actual = parseFloat(actualOkQty && actualOkQty.value) || 0;
+            if (prodMiss) prodMiss.value = (planned - actual);
+
+            var totalSec = 0;
+            for (var i = 0; i < operation.options.length; i++) {
+                var opt = operation.options[i];
+                if (opt.selected && opt.dataset && opt.dataset.seconds) {
+                    totalSec += parseFloat(opt.dataset.seconds) || 0;
+                }
+            }
+            var minsPerPc = totalSec / 60;
+
+            if (noCycleFlag && noCycleFlag.value === '1') {
+                if (idealCyclePerPc) {
+                    idealCyclePerPc.value = '';
+                    idealCyclePerPc.setAttribute('placeholder', 'N/A');
+                }
+                if (totalIdealMins) {
+                    totalIdealMins.value = '';
+                    totalIdealMins.setAttribute('placeholder', 'N/A');
+                }
+                if (totalUnaccountedMins) {
+                    totalUnaccountedMins.value = '';
+                    totalUnaccountedMins.setAttribute('placeholder', 'N/A');
+                }
+                triggerOeeRecalc();
+                return;
+            }
+
+            if (idealCyclePerPc) idealCyclePerPc.value = minsPerPc > 0 ? minsPerPc.toFixed(2) : '0';
+            if (totalIdealMins) totalIdealMins.value = (actual * minsPerPc).toFixed(1);
+            if (totalUnaccountedMins) {
+                var available = parseFloat(totalRuntimeMins && totalRuntimeMins.value) || 0;
+                var idealUsed = parseFloat(totalIdealMins && totalIdealMins.value) || 0;
+                totalUnaccountedMins.value = (available - idealUsed).toFixed(1);
+            }
+            triggerOeeRecalc();
+        }
+
+        function loadAllOperations(reason) {
+            fetchJsonWithFallback('/master/api/operations')
+                .then(function (ops) {
+                    resetSelect(operation, null);
+                    if (reason) {
+                        var info = new Option(reason, '');
+                        info.disabled = true;
+                        operation.add(info);
+                    }
+                    (ops || []).forEach(function (op) {
+                        var opt = new Option(op.name, op.id);
+                        opt.dataset.seconds = '';
+                        operation.add(opt);
+                    });
+                    if (noCycleFlag) noCycleFlag.value = '1';
+                    recalcIdealAndProdMiss();
+                    log('Loaded all operations count=' + (ops ? ops.length : 0));
+                })
+                .catch(function (err) {
+                    log('Failed loading all operations: ' + err.message);
+                    resetSelect(operation, 'Failed to load operations');
+                });
+        }
+
+        function loadOperationsByCombo() {
+            var mid = machine.value;
+            var cid = customer.value;
+            var sid = section.value;
+            var clid = cutLength.value;
+            log('Combo machine=' + mid + ', customer=' + cid + ', section=' + sid + ', cl=' + clid);
+            if (!mid || !cid || !sid || !clid) {
+                resetSelect(operation, 'Select machine + customer + section + cut length first');
+                if (noCycleFlag) noCycleFlag.value = '1';
+                return;
+            }
+            fetchJsonWithFallback('/master/api/cycle-times?cl_id=' + encodeURIComponent(clid) + '&machine_id=' + encodeURIComponent(mid))
+                .then(function (data) {
+                    var processes = (data && data.processes) ? data.processes : [];
+                    var mapped = processes.filter(function (p) { return !!p.operation_type_id; });
+                    log('Cycle processes=' + processes.length + ', mapped=' + mapped.length);
+                    if (mapped.length === 0) {
+                        loadAllOperations('No mapped process for this combo. Showing all operations.');
+                        return;
+                    }
+                    resetSelect(operation, null);
+                    mapped.forEach(function (p) {
+                        var opt = new Option(p.name, p.operation_type_id);
+                        opt.dataset.seconds = p.seconds || '';
+                        operation.add(opt);
+                    });
+                    if (noCycleFlag) noCycleFlag.value = '';
+                    recalcIdealAndProdMiss();
+                })
+                .catch(function (err) {
+                    log('Failed combo operation load: ' + err.message);
+                    loadAllOperations('Combo fetch failed. Showing all operations.');
+                });
+        }
+
+        if (shed) {
+            shed.addEventListener('change', function () {
+                log('Shed changed: ' + shed.value);
+                loadMachinesForShed(shed.value, '').then(function () {
+                    loadOperationsByCombo();
+                });
+            });
+        }
+
+        customer.addEventListener('change', function () {
+            var cid = customer.value;
+            log('Customer changed: ' + cid);
+            if (sectionHidden) sectionHidden.value = '';
+            if (cutLengthHidden) cutLengthHidden.value = '';
+            resetSelect(section, 'Loading sections...');
+            resetSelect(cutLength, 'Select section first');
+            resetSelect(operation, 'Select section + cut length first');
+            if (!cid) {
+                resetSelect(section, 'Select Customer First');
+                return;
+            }
+            fetchJsonWithFallback('/master/api/sections/' + encodeURIComponent(cid))
+                .then(function (rows) {
+                    resetSelect(section, 'Select Section');
+                    (rows || []).forEach(function (r) { section.add(new Option(r.number, r.id)); });
+                    log('Sections loaded=' + (rows ? rows.length : 0));
+                    if (rows && rows.length) {
+                        section.selectedIndex = 1;
+                        section.dispatchEvent(new Event('change'));
+                    }
+                })
+                .catch(function (err) {
+                    log('Failed sections load: ' + err.message);
+                    resetSelect(section, 'Failed to load sections');
+                });
+        });
+
+        section.addEventListener('change', function () {
+            var sid = section.value;
+            log('Section changed: ' + sid);
+            if (sectionHidden) sectionHidden.value = sid ? section.options[section.selectedIndex].text : '';
+            if (cutLengthHidden) cutLengthHidden.value = '';
+            resetSelect(cutLength, 'Loading cut lengths...');
+            resetSelect(operation, 'Select cut length first');
+            if (!sid) {
+                resetSelect(cutLength, 'Select Section First');
+                return;
+            }
+            fetchJsonWithFallback('/master/api/cut-lengths/' + encodeURIComponent(sid))
+                .then(function (rows) {
+                    resetSelect(cutLength, 'Select Cut Length');
+                    (rows || []).forEach(function (r) { cutLength.add(new Option(r.length + ' mm', r.id)); });
+                    log('Cut lengths loaded=' + (rows ? rows.length : 0));
+                    if (rows && rows.length) {
+                        cutLength.selectedIndex = 1;
+                        cutLength.dispatchEvent(new Event('change'));
+                    }
+                })
+                .catch(function (err) {
+                    log('Failed cut lengths load: ' + err.message);
+                    resetSelect(cutLength, 'Failed to load cut lengths');
+                });
+        });
+
+        cutLength.addEventListener('change', function () {
+            log('Cut length changed: ' + cutLength.value);
+            if (cutLengthHidden) {
+                cutLengthHidden.value = cutLength.value ? cutLength.options[cutLength.selectedIndex].text.replace(' mm', '') : '';
+            }
+            loadOperationsByCombo();
+        });
+
+        machine.addEventListener('change', function () {
+            log('Machine changed: ' + machine.value);
+            loadOperationsByCombo();
+        });
+
+        if (shed && shed.value) {
+            loadMachinesForShed(shed.value, machine.value || '');
+        } else {
+            resetSelect(machine, 'Select Shed First');
+        }
+        if (plannedQty) plannedQty.addEventListener('input', recalcIdealAndProdMiss);
+        if (actualOkQty) actualOkQty.addEventListener('input', recalcIdealAndProdMiss);
+        operation.addEventListener('change', recalcIdealAndProdMiss);
+        if (window.jQuery) $(operation).on('change', recalcIdealAndProdMiss);
+        if (plannedQty) plannedQty.addEventListener('input', triggerOeeRecalc);
+        if (actualOkQty) actualOkQty.addEventListener('input', triggerOeeRecalc);
+        if (selfRejectionWeightInput) {
+            selfRejectionWeightInput.addEventListener('input', function () {
+                recalculateSelfRejectionSummary();
+                triggerOeeRecalc();
+            });
+        }
+        if (startTimeInput) startTimeInput.addEventListener('change', triggerOeeRecalc);
+        if (endTimeInput) endTimeInput.addEventListener('change', triggerOeeRecalc);
+        if (shiftHidden) shiftHidden.addEventListener('change', triggerOeeRecalc);
+        operation.addEventListener('change', triggerOeeRecalc);
+        if (window.jQuery) $(operation).on('change', triggerOeeRecalc);
+
+        // Downtime fallback bindings
+        if (toggleDowntimeBtn && downtimeSection) {
+            toggleDowntimeBtn.addEventListener('click', function () {
+                downtimeSection.style.display = (downtimeSection.style.display === 'none' || !downtimeSection.style.display) ? 'block' : 'none';
+                log('Downtime section toggled -> ' + downtimeSection.style.display);
+                if (downtimeSection.style.display === 'block' && downtimeReasonsCache.length === 0) {
+                    loadDowntimeReasonsFallback();
+                }
+            });
+        }
+
+        if (addMoreDowntimeBtn && downtimeContainer && downtimeRowTemplate) {
+            addMoreDowntimeBtn.addEventListener('click', function () {
+                var row = downtimeRowTemplate.querySelector('.downtime-row');
+                if (!row) return;
+                var clone = row.cloneNode(true);
+                var dur = clone.querySelector('.downtime-duration');
+                var rsn = clone.querySelector('.downtime-reason');
+                if (dur) dur.value = '';
+                if (rsn) rsn.value = '';
+                downtimeContainer.appendChild(clone);
+                populateDowntimeReasonSelects();
+                calculateFallbackDowntimeTotals();
+                log('Added downtime row');
+            });
+        }
+
+        if (addSelfRejectionRowBtn && selfRejectionContainer && selfRejectionRowTemplate) {
+            addSelfRejectionRowBtn.addEventListener('click', function () {
+                var row = selfRejectionRowTemplate.content
+                    ? selfRejectionRowTemplate.content.querySelector('.self-rejection-row')
+                    : selfRejectionRowTemplate.querySelector('.self-rejection-row');
+                if (!row) return;
+                var clone = row.cloneNode(true);
+                var defect = clone.querySelector('.self-rejection-defect');
+                var qty = clone.querySelector('.self-rejection-qty');
+                if (defect) defect.value = '';
+                if (qty) qty.value = '0';
+                selfRejectionContainer.appendChild(clone);
+                recalculateSelfRejectionSummary();
+            });
+        }
+
+        if (downtimeContainer) {
+            downtimeContainer.addEventListener('click', function (e) {
+                var btn = e.target.closest('.remove-downtime');
+                if (!btn) return;
+                var row = btn.closest('.downtime-row');
+                if (row) {
+                    row.remove();
+                    calculateFallbackDowntimeTotals();
+                    triggerOeeRecalc();
+                    log('Removed downtime row');
+                }
+            });
+            downtimeContainer.addEventListener('input', function (e) {
+                if (e.target.classList.contains('downtime-duration')) {
+                    calculateFallbackDowntimeTotals();
+                    triggerOeeRecalc();
+                }
+            });
+        }
+        if (selfRejectionContainer) {
+            selfRejectionContainer.addEventListener('click', function (e) {
+                var btn = e.target.closest('.remove-self-rejection-row');
+                if (!btn) return;
+                var row = btn.closest('.self-rejection-row');
+                if (!row) return;
+                var rows = selfRejectionContainer.querySelectorAll('.self-rejection-row');
+                if (rows.length <= 1) return;
+                row.remove();
+                recalculateSelfRejectionSummary();
+                triggerOeeRecalc();
+            });
+            selfRejectionContainer.addEventListener('input', function (e) {
+                if (e.target.classList.contains('self-rejection-qty')) {
+                    recalculateSelfRejectionSummary();
+                    triggerOeeRecalc();
+                }
+            });
+            selfRejectionContainer.addEventListener('change', function (e) {
+                if (e.target.classList.contains('self-rejection-defect')) {
+                    recalculateSelfRejectionSummary();
+                }
+            });
+        }
+        if (machiningScrapKgInput) {
+            machiningScrapKgInput.addEventListener('input', function () {
+                recalculateSelfRejectionSummary();
+                triggerOeeRecalc();
+            });
+            machiningScrapKgInput.addEventListener('change', function () {
+                recalculateSelfRejectionSummary();
+                triggerOeeRecalc();
+            });
+        }
+        if (selfRejectionWeightInput) {
+            selfRejectionWeightInput.addEventListener('input', function () {
+                recalculateSelfRejectionSummary();
+                triggerOeeRecalc();
+            });
+            selfRejectionWeightInput.addEventListener('change', function () {
+                recalculateSelfRejectionSummary();
+                triggerOeeRecalc();
+            });
+        }
+        if (shiftHidden) {
+            shiftHidden.addEventListener('change', calculateFallbackDowntimeTotals);
+            shiftHidden.addEventListener('change', function () { syncOperatorTimes(true); });
+            shiftHidden.addEventListener('change', function () { syncSupervisorTimes(true); });
+        }
+        if (startTimeInput) {
+            startTimeInput.addEventListener('change', function () { syncOperatorTimes(true); });
+            startTimeInput.addEventListener('change', function () { syncSupervisorTimes(true); });
+            startTimeInput.addEventListener('change', calculateFallbackDowntimeTotals);
+        }
+        if (endTimeInput) {
+            endTimeInput.addEventListener('change', function () { syncOperatorTimes(true); });
+            endTimeInput.addEventListener('change', function () { syncSupervisorTimes(true); });
+            endTimeInput.addEventListener('change', calculateFallbackDowntimeTotals);
+        }
+        document.addEventListener('click', function (e) {
+            var pill = e.target.closest('.shift-pill');
+            if (!pill) return;
+            setTimeout(function () {
+                syncShiftHiddenFromPills();
+                calculateFallbackDowntimeTotals();
+                triggerOeeRecalc();
+            }, 0);
+        });
+        if (addOperatorBtn && !addOperatorBtn.dataset.fallbackBound) {
+            addOperatorBtn.dataset.fallbackBound = '1';
+            addOperatorBtn.addEventListener('click', function () {
+                addOperatorRowFallback();
+            });
+        }
+        if (addSupervisorBtn) {
+            if (!addSupervisorBtn.dataset.fallbackBound) {
+                addSupervisorBtn.dataset.fallbackBound = '1';
+                addSupervisorBtn.addEventListener('click', function () {
+                    addSupervisorRowFallback();
+                });
+            }
+        }
+
+        if (operatorsContainer) {
+            operatorsContainer.addEventListener('click', function (e) {
+                var btn = e.target.closest('.remove-operator');
+                if (!btn) return;
+                var rows = operatorsContainer.querySelectorAll('.operator-row');
+                if (rows.length <= 1) return;
+                var row = btn.closest('.operator-row');
+                if (row) row.remove();
+                log('Removed operator row');
+            });
+        }
+        if (supervisorsContainer) {
+            supervisorsContainer.addEventListener('click', function (e) {
+                var btn = e.target.closest('.remove-supervisor');
+                if (!btn) return;
+                var rows = supervisorsContainer.querySelectorAll('.supervisor-row');
+                if (rows.length <= 1) return;
+                var row = btn.closest('.supervisor-row');
+                if (row) row.remove();
+                log('Removed supervisor row');
+            });
+        }
+
+        // Operator/Supervisor employee lookup fallback (works for dynamic rows too)
+        document.addEventListener('blur', function (e) {
+            var input = e.target;
+            if (!input) return;
+
+            var isOperator = input.classList && input.classList.contains('operator-code');
+            var isSupervisor = input.classList && input.classList.contains('supervisor-code');
+            if (!isOperator && !isSupervisor) return;
+
+            var code = (input.value || '').trim();
+            var row = input.closest(isOperator ? '.operator-row' : '.supervisor-row');
+            if (!row) return;
+
+            var nameEl = row.querySelector(isOperator ? '.operator-name-display' : '.supervisor-name-display');
+            var idEl = row.querySelector(isOperator ? '.operator-id-hidden' : '.supervisor-id-hidden');
+
+            if (!code) {
+                if (nameEl) nameEl.value = '';
+                if (idEl) idEl.value = '';
+                return;
+            }
+
+            if (nameEl) nameEl.value = 'Searching...';
+            fetchEmployeeByCode(code)
+                .then(function (data) {
+                    if (data && data.success) {
+                        if (nameEl) {
+                            nameEl.value = data.emp_name || '';
+                            nameEl.classList.remove('is-invalid');
+                        }
+                        if (idEl) idEl.value = data.emp_id || '';
+                        log((isOperator ? 'Operator' : 'Supervisor') + ' lookup success for code=' + code);
+                    } else {
+                        throw new Error('Employee not found');
+                    }
+                })
+                .catch(function (err) {
+                    if (nameEl) {
+                        nameEl.value = 'Not found';
+                        nameEl.classList.add('is-invalid');
+                    }
+                    if (idEl) idEl.value = '';
+                    log((isOperator ? 'Operator' : 'Supervisor') + ' lookup failed for code=' + code + ' (' + err.message + ')');
+                });
+        }, true);
+
+        // Submit pre-check fallback: overlap + no downtime confirmation
+        if (prodForm && !prodForm.dataset.fallbackSubmitBound) {
+            prodForm.dataset.fallbackSubmitBound = '1';
+            prodForm.addEventListener('submit', function (e) {
+                if (prodForm.dataset.fallbackForceSubmit === '1') {
+                    prodForm.dataset.fallbackForceSubmit = '0';
+                    return;
+                }
+                e.preventDefault();
+                if (!validateIdealVsAvailableForSubmit()) return;
+
+                recalculateSelfRejectionSummary();
+                var selfRejectionQty = safeNum(selfRejectionQtyInput && selfRejectionQtyInput.value);
+                var selfRejectionWeight = safeNum(selfRejectionWeightInput && selfRejectionWeightInput.value);
+                var machiningScrapKg = safeNum(machiningScrapKgInput && machiningScrapKgInput.value);
+                var selfRows = selfRejectionContainer ? Array.from(selfRejectionContainer.querySelectorAll('.self-rejection-row')) : [];
+                var validSelfRows = selfRows.filter(function (row) {
+                    return !!(row.querySelector('.self-rejection-defect') && row.querySelector('.self-rejection-defect').value) &&
+                        safeNum(row.querySelector('.self-rejection-qty') && row.querySelector('.self-rejection-qty').value) > 0;
+                });
+                if (machiningScrapKg <= 0) {
+                    alert('Enter Total Machining Scrap (kg) before submitting.');
+                    if (machiningScrapKgInput) machiningScrapKgInput.focus();
+                    return;
+                }
+                if (selfRejectionWeight <= 0) {
+                    alert('Enter Weight/PC (kg) (must be greater than 0) before submitting.');
+                    if (selfRejectionWeightInput) selfRejectionWeightInput.focus();
+                    return;
+                }
+
+                var selectedOps = Array.from(operation.options).filter(function (o) { return o.selected && o.value; });
+                if (selectedOps.length === 0) {
+                    log('Blocked submit: no operation selected');
+                    alert('Please select at least one Operation / Process before submitting.');
+                    return;
+                }
+
+                // Validate production window ordering (server validates too).
+                if (startTimeInput && endTimeInput && startTimeInput.value && endTimeInput.value) {
+                    var st = new Date(startTimeInput.value);
+                    var et = new Date(endTimeInput.value);
+                    if (st.getTime() >= et.getTime()) {
+                        alert('Actual Production Start Time must be earlier than Actual Production End Time.');
+                        endTimeInput.focus();
+                        return;
+                    }
+                }
+
+                function validateRowTimes(rows, startSelector, endSelector, label) {
+                    for (var i = 0; i < rows.length; i++) {
+                        var row = rows[i];
+                        var sEl = row.querySelector(startSelector);
+                        var eEl = row.querySelector(endSelector);
+                        if (!sEl || !eEl) continue;
+                        if (!sEl.value || !eEl.value) continue;
+                        var s = new Date(sEl.value);
+                        var e2 = new Date(eEl.value);
+                        if (s.getTime() >= e2.getTime()) {
+                            alert(label + ' row #' + (i + 1) + ': Start Time must be earlier than End Time.');
+                            eEl.focus();
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+
+                var opRows = operatorsContainer ? Array.from(operatorsContainer.querySelectorAll('.operator-row')) : [];
+                if (!validateRowTimes(opRows, '.op-start-time', '.op-end-time', 'Operator')) return;
+                var supRows = supervisorsContainer ? Array.from(supervisorsContainer.querySelectorAll('.supervisor-row')) : [];
+                if (!validateRowTimes(supRows, '.sup-start-time', '.sup-end-time', 'Supervisor')) return;
+ 
+                var overlapUrl = '/api/production-entries/check-overlap?machine_id=' + encodeURIComponent(machine.value || '') +
+                    '&start_time=' + encodeURIComponent(startTimeInput ? startTimeInput.value : '') +
+                    '&end_time=' + encodeURIComponent(endTimeInput ? endTimeInput.value : '');
+
+                fetchJsonWithFallback(overlapUrl)
+                    .then(function (data) {
+                        if (data && data.overlap) {
+                            var entry = data.entry || {};
+                            log('Overlap detected with entry id=' + (entry.id || ''));
+                            if (conflictDetailsBody) {
+                                conflictDetailsBody.innerHTML =
+                                    '<tr><td><strong>Machine</strong></td><td>' + (entry.machine_name || '-') + '</td></tr>' +
+                                    '<tr><td><strong>Time Range</strong></td><td>' + (entry.start_time || '-') + ' to ' + (entry.end_time || '-') + '</td></tr>' +
+                                    '<tr><td><strong>Customer</strong></td><td>' + (entry.customer_name || '-') + '</td></tr>' +
+                                    '<tr><td><strong>Section</strong></td><td>' + (entry.section_number || '-') + '</td></tr>' +
+                                    '<tr><td><strong>Cut Length</strong></td><td>' + (entry.cutlength || '-') + '</td></tr>' +
+                                    '<tr><td><strong>Process</strong></td><td>' + ((entry.processes || []).join(', ') || '-') + '</td></tr>';
+                            }
+                            ensureConflictEditButton(entry.id);
+                            if (window.bootstrap && overlapModalEl) {
+                                new window.bootstrap.Modal(overlapModalEl).show();
+                            } else {
+                                if (entry.id && confirm('Overlap exists. Open existing entry for edit?')) {
+                                    var base = appBase();
+                                    window.location.href = (base ? base : '') + '/entry/' + entry.id + '/edit';
+                                }
+                            }
+                            return;
+                        }
+
+                        var hasDowntime = false;
+                        if (downtimeContainer) {
+                            hasDowntime = Array.from(downtimeContainer.querySelectorAll('.downtime-reason')).some(function (s) { return !!s.value; });
+                        }
+                        if (!hasDowntime) {
+                            log('No planned downtime selected; showing confirmation');
+                            if (window.bootstrap && confirmNoDowntimeModalEl) {
+                                new window.bootstrap.Modal(confirmNoDowntimeModalEl).show();
+                            } else if (confirm('No planned downtime selected. Submit anyway?')) {
+                                prodForm.dataset.fallbackForceSubmit = '1';
+                                prodForm.submit();
+                            }
+                            return;
+                        }
+
+                        prodForm.dataset.fallbackForceSubmit = '1';
+                        prodForm.submit();
+                    })
+                    .catch(function (err) {
+                        log('Overlap pre-check failed: ' + err.message + '. Submitting directly.');
+                        prodForm.dataset.fallbackForceSubmit = '1';
+                        prodForm.submit();
+                    });
+            });
+        }
+
+        if (forceSubmitBtn && !forceSubmitBtn.dataset.fallbackBound) {
+            forceSubmitBtn.dataset.fallbackBound = '1';
+            forceSubmitBtn.addEventListener('click', function () {
+                if (!prodForm) return;
+                prodForm.dataset.fallbackForceSubmit = '1';
+                prodForm.submit();
+            });
+        }
+
+        log('Fallback dropdown loader initialized');
+        resetSelect(section, 'Select Customer First');
+        resetSelect(cutLength, 'Select Section First');
+        resetSelect(operation, 'Select machine + customer + section + cut length first');
+        recalcIdealAndProdMiss();
+        recalculateSelfRejectionSummary();
+        calculateFallbackDowntimeTotals();
+        triggerOeeRecalc();
+        syncOperatorTimes(false);
+        syncSupervisorTimes(false);
+        loadDowntimeReasonsFallback();
+        if (customer.value) customer.dispatchEvent(new Event('change'));
+        setInterval(triggerOeeRecalc, 1500);
+    })();
+</script>
+{% endblock %}

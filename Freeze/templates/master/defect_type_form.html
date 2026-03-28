@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block page_title %}{{ 'Edit' if defect else 'New' }} Defect Type{% endblock %}
+{% block page_subtitle %}Manage Defect Type Details{% endblock %}
+{% block title %}Add/Edit Defect Type - Machine Shop{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-xl-6 col-lg-8 col-md-10">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">{{ 'Edit' if defect else 'Add' }} Defect Type</h6>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Defect Name</label>
+                        <input type="text" class="form-control" name="defect_name"
+                            value="{{ defect.defect_name if defect }}" required>
+                        <div class="form-text">e.g., Scratches, Porosity, Dimensions</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Category</label>
+                        <select class="form-select" name="category" required>
+                            <option value="Surface" {% if defect and defect.category=='Surface' %}selected{% endif %}>
+                                Surface</option>
+                            <option value="Material" {% if defect and defect.category=='Material' %}selected{% endif %}>
+                                Material</option>
+                            <option value="Dimensional" {% if defect and defect.category=='Dimensional' %}selected{%
+                                endif %}>Dimensional</option>
+                            <option value="Machining" {% if defect and defect.category=='Machining' %}selected{% endif
+                                %}>Machining</option>
+                            <option value="Other" {% if defect and defect.category=='Other' %}selected{% endif %}>Other
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3 form-check form-switch mt-4">
+                        <input class="form-check-input" type="checkbox" id="isActive" name="is_active" {% if not defect
+                            or defect.is_active %}checked{% endif %}>
+                        <label class="form-check-label" for="isActive">Active in dropdowns</label>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                        <a href="{{ url_for('master_data.list_defect_types') }}"
+                            class="btn btn-light me-md-2">Cancel</a>
+                        <button type="submit" class="btn btn-primary">Save Defect Type</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

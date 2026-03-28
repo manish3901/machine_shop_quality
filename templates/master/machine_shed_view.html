@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block page_title %}{{ shed.shed_name }}{% endblock %}
+{% block page_subtitle %}Machines Linked To This Shed{% endblock %}
+{% block title %}{{ shed.shed_name }} - Machine Shed Details{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h3 text-gray-800 mb-1">{{ shed.shed_name }}</h1>
+        <div class="text-muted">{{ shed.description or 'No description added.' }}</div>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('master_data.edit_machine_shed', shed_id=shed.id) }}" class="btn btn-outline-primary">
+            <i class="fas fa-edit me-2"></i>Edit Shed
+        </a>
+        <a href="{{ url_for('master_data.list_machine_sheds') }}" class="btn btn-light">
+            <i class="fas fa-arrow-left me-2"></i>Back
+        </a>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-uppercase text-muted small fw-bold mb-2">Status</div>
+                <div class="fs-5 fw-bold">{{ shed.status or 'Active' }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-uppercase text-muted small fw-bold mb-2">Total Machines</div>
+                <div class="fs-5 fw-bold">{{ machines|length }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-uppercase text-muted small fw-bold mb-2">Created</div>
+                <div class="fs-6 fw-bold">{{ shed.created_at.strftime('%d-%m-%Y %H:%M') if shed.created_at else '-' }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow mb-4">
+    <div class="card-header py-3 d-flex justify-content-between align-items-center">
+        <h6 class="m-0 font-weight-bold text-primary">Machines In This Shed</h6>
+        <span class="badge bg-primary-subtle text-primary">{{ machines|length }} linked</span>
+    </div>
+    <div class="card-body">
+        <div class="row g-3 mb-3">
+            <div class="col-md-6 col-lg-4">
+                <label for="shedMachineSearch" class="form-label fw-bold">Search Machine</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="fas fa-search"></i></span>
+                    <input type="text" class="form-control" id="shedMachineSearch" placeholder="Type machine name...">
+                </div>
+                <div class="form-text">Filters the list instantly by machine name.</div>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-bordered align-middle mb-0" id="shedMachinesTable">
+                <thead>
+                    <tr>
+                        <th style="width:70px;">Sr. No</th>
+                        <th>Machine Name</th>
+                        <th>Machine Type</th>
+                        <th>Status</th>
+                        <th>Monthly Capacity</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for machine in machines %}
+                    <tr class="shed-machine-row">
+                        <td class="text-muted text-end">{{ loop.index }}</td>
+                        <td class="fw-bold">{{ machine.machine_name }}</td>
+                        <td>{{ machine.machine_type }}</td>
+                        <td>{{ machine.status }}</td>
+                        <td>{{ machine.monthly_capacity or 0 }}</td>
+                    </tr>
+                    {% else %}
+                    <tr id="shedMachinesEmptyState">
+                        <td colspan="5" class="text-center text-muted py-4">No machines linked to this shed.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if machines %}
+        <div id="shedMachinesNoSearchResults" class="text-center text-muted py-4 d-none">
+            No machines match the current search.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    (function () {
+        var searchInput = document.getElementById('shedMachineSearch');
+        if (!searchInput) return;
+
+        var rows = Array.prototype.slice.call(document.querySelectorAll('.shed-machine-row'));
+        var noResults = document.getElementById('shedMachinesNoSearchResults');
+
+        searchInput.addEventListener('input', function () {
+            var term = (searchInput.value || '').trim().toLowerCase();
+            var visibleCount = 0;
+
+            rows.forEach(function (row) {
+                var machineName = (row.cells[0] && row.cells[0].textContent || '').toLowerCase();
+                var matches = !term || machineName.indexOf(term) !== -1;
+                row.style.display = matches ? '' : 'none';
+                if (matches) visibleCount += 1;
+            });
+
+            if (noResults) {
+                noResults.classList.toggle('d-none', visibleCount > 0);
+            }
+        });
+    })();
+</script>
+{% endblock %}
