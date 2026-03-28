@@ -1,675 +1,345 @@
-# Machine Shop Production Planning System
+# Machine Shop Production and Quality Management System
 
 ## Overview
 
-A comprehensive web-based production planning and tracking system for machine shops. Digitizes daily production tracking for CNC, VMC, and other machines across multiple shifts (A, B, C). Provides real-time dashboards, analytics, and root cause analysis to identify bottlenecks and improve production efficiency.
+This project is a web application built for a machine shop environment where the Production Department and Quality Department work on the same daily output but often maintain information separately.
 
-## Key Features
+The system brings both teams onto one platform:
 
-### 📊 Core Functionality
-- **Daily Production Entry**: Form-based data entry for each machine per shift
-- **Plan vs Actual Tracking**: Real-time variance analysis and efficiency metrics
-- **Shift-wise Monitoring**: Separate tracking for A, B, and C shifts (6AM-2PM, 2PM-10PM, 10PM-6AM)
-- **Issue Categorization**: Structured issue tracking (No Operator, No Material, Setup Delay, QC Issue, Machine Breakdown, Tool Change)
-- **Bulk CSV Upload**: Import multiple entries at once
+- Production records what was planned, what was actually produced, who worked on it, what machine was used, and what issues affected output.
+- Quality records inspection results, rejection details, rework, and defect-wise analysis against the same production entries.
 
-### 📈 Analytics & Dashboards
-- **Daily Dashboard**: Real-time production metrics, efficiency scores, top issues
-- **Weekly Reports**: Trend analysis, performance comparison
-- **Machine Performance**: Utilization heatmap, downtime analysis, historical trends
-- **Shift Analysis**: Shift-wise efficiency comparison, bottleneck identification
-- **Issues Analysis**: Pareto charts, root cause categorization, trend tracking
+Because both departments are connected to the same production records, the shop gets a clearer view of what was produced, what was accepted, what was rejected, what was reworked, and where the main losses are happening.
 
-### 🗄️ Master Data Management
-- Machine catalog (name, type, specs)
-- Customer database
-- Operation types with standard cycle times
-- Issue types and severity levels
-- Employee/operator directory
+## Why This System Helps
 
-### 🔐 Audit & Compliance
-- Complete audit trail for all changes
-- User-based activity tracking
-- Timestamp on every entry
-- Role-based access control (Phase 2)
+In many machine shops, production and quality data are tracked in separate sheets, notebooks, or disconnected systems. That creates common problems:
 
----
+- delayed visibility into actual shift performance
+- mismatch between production quantity and inspected quantity
+- difficulty tracking rejection and rework against a specific job or machine
+- repeated manual reporting at the end of the day or week
+- weak root-cause analysis for low efficiency, downtime, and scrap
+
+This application solves that by creating one operational flow from plan to production to inspection to analysis.
+
+## Business Value
+
+### For the Production Department
+
+- captures daily production shift-wise and machine-wise
+- compares planned quantity against actual quantity
+- tracks downtime, issues, and efficiency losses
+- shows operator, supervisor, machine, customer, section, and operation details together
+- helps production leaders identify underperforming machines, shifts, and bottlenecks quickly
+
+### For the Quality Department
+
+- links quality rejection directly to the original production entry
+- records defect-wise rejection quantities
+- captures rework details and their impact on final accepted quantity
+- improves traceability of inspection decisions
+- helps the team analyze recurring defects by customer, section, machine, shift, and date
+
+### For Management
+
+- provides dashboards instead of manual spreadsheet follow-up
+- improves accountability with user-linked records and timestamps
+- supports daily review meetings with better facts
+- helps reduce scrap, rework, and hidden losses
+- creates a stronger base for continuous improvement and OEE-style tracking
+
+## End-to-End Workflow
+
+### 1. Production Planning and Entry
+
+The production team creates or records daily output for each machine and shift. A production entry can include:
+
+- production date and shift
+- machine and shed
+- customer, section, and cut length
+- planned quantity and actual quantity
+- operators and supervisors
+- operation or process details
+- downtime and issue reasons
+- remarks and related context
+
+### 2. Production Monitoring
+
+Supervisors and managers can review production records to compare:
+
+- plan vs actual
+- machine-wise performance
+- shift-wise performance
+- issue impact
+- downtime and efficiency
+
+### 3. Quality Inspection and Rejection
+
+The quality team can open the rejection form against a production record and inspect:
+
+- total inspected quantity
+- defect-wise rejection summary
+- rework summary
+- quality supervisor details
+- final quality impact on the production record
+
+This keeps quality events connected to the actual production history instead of being stored separately.
+
+### 4. Quality and Production Analysis
+
+Once production and quality data are stored together, the system can show:
+
+- daily and weekly dashboard summaries
+- machine performance trends
+- issue analysis
+- shift comparison
+- rejection records and defect-wise breakdown
+- rework visibility
+- final OK quantity after quality impact
+
+## Main Modules
+
+### Production Module
+
+Used by the production department to record and manage day-to-day machine output.
+
+Key outcomes:
+
+- daily production entry
+- viewing and editing production records
+- plan vs actual tracking
+- machine and shift performance review
+
+### Quality Rejection Module
+
+Used by the quality department to log inspection outcome against production records.
+
+Key outcomes:
+
+- defect-wise rejection capture
+- rework recording
+- linked production inspection context
+- rejection and rework history
+
+### Dashboards and Analytics
+
+Used by supervisors, production heads, quality engineers, and management.
+
+Key outcomes:
+
+- daily dashboard
+- weekly dashboard
+- machine performance analysis
+- employee performance insights
+- shift analysis
+- issues analysis
+
+### Master Data Management
+
+Used to maintain the reference data that drives the application.
+
+Typical master data includes:
+
+- machines
+- sheds
+- machine types
+- customers
+- sections
+- cut lengths
+- operations
+- employees
+- issue types
+- defect types
+- downtime reasons
+
+### Access Control
+
+Used to control who can access production, dashboards, quality forms, and records. This is especially helpful when production and quality responsibilities need separate permissions.
+
+## How Production and Quality Stay Connected
+
+The biggest strength of this project is the link between production entries and quality rejection entries.
+
+That connection helps the organization answer questions like:
+
+- Which machine produced the rejected parts?
+- Which shift had the highest rejection?
+- Which customer section or cut length is creating repeated quality issues?
+- How much of the rejected quantity was recovered through rework?
+- What is the final accepted quantity after inspection?
+- Are low production efficiency and high rejection happening together?
+
+This is where the project becomes more than a data-entry tool. It becomes an operational decision system.
+
+## Typical Users
+
+- Production operators
+- Production supervisors
+- Shift in-charges
+- Quality inspectors
+- Quality supervisors
+- Department heads
+- Management reviewers
+- Admin or master data maintainers
 
 ## Project Structure
 
-```
+```text
 machine_shop/
-├── app.py                    # Flask application factory
-├── config.py                 # Configuration management
-├── models.py                 # SQLAlchemy database models
-├── requirements.txt          # Python dependencies
+├── __init__.py
+├── config.py
+├── models.py
+├── ms_planning.py
+├── requirements.txt
 ├── routes/
-│   ├── __init__.py
-│   ├── api.py               # REST API endpoints
-│   ├── web.py               # Web form pages
-│   ├── dashboard.py         # Dashboard pages
-│   └── master_data.py       # Master data CRUD
+│   ├── access_control.py
+│   ├── api.py
+│   ├── dashboard.py
+│   ├── master_data.py
+│   ├── rejection.py
+│   └── web.py
 ├── templates/
-│   ├── base.html            # Base template with navigation
-│   ├── production_entry.html # Data entry form
-│   ├── view_entries.html    # View all entries
-│   ├── dashboard_daily.html # Daily dashboard
-│   ├── machine_performance.html  # Machine metrics
-│   ├── shift_analysis.html  # Shift comparison
-│   ├── issues_analysis.html # Issue deep-dive
-│   └── master/              # Master data templates
-├── static/
-│   ├── css/
-│   └── js/
-└── uploads/                 # User uploaded files (bulk CSVs, photos)
+│   ├── production_entry.html
+│   ├── view_entries.html
+│   ├── dashboard_daily.html
+│   ├── dashboard_weekly.html
+│   ├── machine_performance.html
+│   ├── shift_analysis.html
+│   ├── issues_analysis.html
+│   ├── rejection_form.html
+│   ├── rejection_records.html
+│   └── master/
+├── utils/
+│   └── auth.py
+└── schema_ms.sql
 ```
 
----
+## Key Functional Areas
 
-## Installation & Setup
+### Production Tracking
+
+- daily production entry
+- actual quantity reporting
+- operator and supervisor mapping
+- machine-wise and shift-wise visibility
+
+### Planning Support
+
+- planning-related utilities and reports
+- comparison between expected and achieved output
+- support for operational review and scheduling decisions
+
+### Quality Tracking
+
+- quality rejection form linked to production
+- defect-wise rejection entries
+- rework summary and logs
+- quality records review
+
+### Analysis and Review
+
+- dashboard-based review
+- issue trend analysis
+- quality impact review
+- shift and employee comparison
+
+## How It Improves Daily Operations
+
+### Better Traceability
+
+Every production record can be followed through inspection, rejection, rework, and final outcome.
+
+### Faster Review Meetings
+
+Production and quality leaders can review one source of truth instead of collecting reports from multiple files.
+
+### Better Loss Identification
+
+The system helps separate losses caused by:
+
+- machine issues
+- manpower issues
+- process issues
+- quality defects
+- downtime
+- planning gaps
+
+### Improved Accountability
+
+Because entries are linked to machines, people, shifts, and dates, it becomes easier to identify where support or corrective action is required.
+
+### Stronger Continuous Improvement
+
+The data collected by this system can support Kaizen, root cause analysis, defect reduction, and process improvement initiatives.
+
+## Setup
 
 ### Prerequisites
-- Python 3.8+
-- PostgreSQL 10+ (or SQLite for development)
-- pip (Python package manager)
 
-### Step 1: Clone & Setup Environment
+- Python 3.10+
+- Database configured through environment variables
+- `pip` for dependency installation
+
+### Local Setup
 
 ```bash
-cd path/to/MOA/machine_shop
-
-# Create virtual environment
-python -m venv venv
-
-# Activate virtual environment
-# On Windows:
-venv\Scripts\activate
-# On macOS/Linux:
-source venv/bin/activate
+cd machine_shop
+python -m venv .venv
 ```
 
-### Step 2: Install Dependencies
+Windows:
+
+```bash
+.venv\Scripts\activate
+```
+
+Install dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### Step 3: Configure Database
-
-Create a `.env` file in the project root:
+Create a local environment file:
 
 ```env
-# Development
-FLASK_ENV=development
-FLASK_APP=app.py
-
-# Database (for PostgreSQL)
-DATABASE_URL=postgresql://username:password@localhost:5432/machine_shop_db
-
-# For SQLite (simple dev setup):
-# DATABASE_URL=sqlite:///machine_shop.db
-
-# Flask
-SECRET_KEY=your-secret-key-here
+SECRET_KEY=change-me
+DATABASE_URL=your-database-connection-string
 ```
 
-### Step 4: Initialize Database
+You can use the included `.env.example` as a starting point.
 
-```bash
-# Create PostgreSQL database
-createdb machine_shop_db
+### Run the Application
 
-# Initialize Flask-Migrate
-flask db init
+Run the project using the application entrypoint used in your environment. In this codebase, the Flask app and route modules are already organized under the `machine_shop` package, so start the app using the same command pattern you use locally today.
 
-# Create initial migration
-flask db migrate -m "Initial schema"
+If your environment already has a working startup command or batch file, continue using that same method.
 
-# Apply migration
-flask db upgrade
-```
+## Suggested Department Use
 
-### Step 5: Load Initial Master Data
+### Production Team Uses It For
 
-```bash
-python
->>> from app import create_app, db
->>> from models import Machine, Customer, OperationType, IssueType
+- entering daily output
+- reviewing variance
+- checking machine performance
+- tracking shift execution
 
->>> app = create_app('development')
->>> with app.app_context():
-...     # Add machines
-...     machines = [
-...         Machine(machine_name='VMC-1', machine_type='VMC', section_number='2191', cutlength=489.7),
-...         Machine(machine_name='VMC-2', machine_type='VMC', section_number='2123', cutlength=418.2),
-...         Machine(machine_name='CNC-1', machine_type='CNC', section_number='99719'),
-...         # Add more as needed
-...     ]
-...     for m in machines:
-...         db.session.add(m)
-...     
-...     # Add customers
-...     customers = [
-...         Customer(customer_name='C2', customer_code='C2'),
-...         Customer(customer_name='AGAM', customer_code='AGAM'),
-...         # Add more
-...     ]
-...     for c in customers:
-...         db.session.add(c)
-...     
-...     # Add operations
-...     operations = [
-...         OperationType(operation_name='SLITTING', standard_cycle_time_seconds=360),
-...         OperationType(operation_name='MILLING', standard_cycle_time_seconds=300),
-...         OperationType(operation_name='DRILLING'),
-...         # Add more
-...     ]
-...     for o in operations:
-...         db.session.add(o)
-...     
-...     # Add issue types
-...     issues = [
-...         IssueType(issue_name='No Operator', category='NO_OPERATOR', severity='High'),
-...         IssueType(issue_name='No Material', category='NO_MATERIAL', severity='High'),
-...         IssueType(issue_name='Setup Delay', category='SETUP_DELAY', severity='Medium'),
-...         IssueType(issue_name='QC Issue', category='QC_ISSUE', severity='Medium'),
-...         IssueType(issue_name='Machine Breakdown', category='BREAKDOWN', severity='Critical'),
-...         IssueType(issue_name='Tool Change', category='TOOL_CHANGE', severity='Low'),
-...     ]
-...     for issue in issues:
-...         db.session.add(issue)
-...     
-...     db.session.commit()
-...     print("Master data loaded!")
-```
+### Quality Team Uses It For
 
-### Step 6: Run Application
+- recording rejection
+- tracking rework
+- monitoring defect trends
+- auditing inspection outcome
 
-```bash
-flask run
-# Server runs at http://localhost:5000
-```
+### Management Uses It For
 
----
+- monitoring daily health of the machine shop
+- comparing departments and shifts
+- prioritizing actions on recurring losses
+- reviewing performance with actual operational evidence
 
-## Usage Guide
+## Summary
 
-### Data Entry (Daily)
-1. Go to **New Entry** → Fill production form
-2. Select date, shift, machine, customer
-3. Enter planned and actual quantities
-4. Document any issues or downtime
-5. Click **Save Entry**
+This project is designed as a practical machine shop operations system, not just a software demo.
 
-### Bulk Import (CSV)
-1. Go to **Bulk Upload**
-2. Prepare CSV with columns:
-   - `production_date` (YYYY-MM-DD)
-   - `shift` (A/B/C)
-   - `machine_id` (ID from machines table)
-   - `customer_id` (ID from customers table)
-   - `planned_quantity`
-   - `actual_quantity` (optional)
-   - `remarks` (optional)
-
-3. Upload file - entries imported automatically
-
-### Dashboard Views
-
-#### Daily Dashboard (Real-time)
-- Overall efficiency score
-- Plan vs actual by machine
-- Shift-wise comparison
-- Top 5 underperforming machines
-- Live entries feed
-
-#### Weekly Report
-- Daily trend lines
-- Cumulative metrics
-- Top 5 issues of the week
-- Day-by-day breakdown
-
-#### Machine Performance
-- Efficiency heatmap (color-coded by performance)
-- Historical trends
-- Downtime analysis
-- Best/worst performers
-- Production volume trends
-
-#### Shift Analysis
-- A, B, C shift efficiency comparison
-- Resources utilization
-- Issue distribution by shift
-- Peak production hours
-
-#### Issues Analysis
-- Pareto chart of top issues
-- Category-wise breakdown
-- Impact analysis (hours lost)
-- Trending issues
-- Machine-issue correlation
-
----
-
-## API Documentation
-
-### Authentication
-Currently no authentication. Phase 2 will add role-based access.
-
-### Base URL
-```
-http://localhost:5000/api
-```
-
-### Endpoints
-
-#### Production Entries
-
-**Create Entry**
-```
-POST /api/production-entries
-Content-Type: application/json
-
-{
-    "production_date": "2024-01-15",
-    "shift": "B",
-    "machine_id": 1,
-    "customer_id": 2,
-    "planned_quantity": 100,
-    "actual_quantity": 85,
-    "cycle_time_seconds": 120,
-    "downtime_minutes": 15,
-    "remarks": "Setup delay",
-    "created_by": "operator_1"
-}
-
-Response: 201 Created
-{
-    "id": 456,
-    "message": "Production entry created successfully"
-}
-```
-
-**Get Entry**
-```
-GET /api/production-entries/{entry_id}
-
-Response: 200 OK
-{
-    "id": 456,
-    "date": "2024-01-15",
-    "shift": "B",
-    "machine": "VMC-1",
-    "customer": "C2",
-    ...
-}
-```
-
-**List Entries** (with filtering)
-```
-GET /api/production-entries?production_date=2024-01-15&machine_id=1&shift=B&page=1
-
-Query Params:
-- production_date: Filter by single date
-- start_date, end_date: Filter by date range
-- machine_id: Filter by machine
-- shift: Filter by shift (A/B/C)
-- customer_id: Filter by customer
-- page: Page number (default: 1, 50 items/page)
-
-Response: 200 OK
-{
-    "entries": [...],
-    "pagination": {
-        "page": 1,
-        "per_page": 50,
-        "total": 245,
-        "pages": 5
-    }
-}
-```
-
-**Update Entry**
-```
-PUT /api/production-entries/{entry_id}
-Content-Type: application/json
-
-{
-    "actual_quantity": 90,
-    "downtime_minutes": 20,
-    "remarks": "Updated remarks",
-    "updated_by": "supervisor_1"
-}
-
-Response: 200 OK
-```
-
-#### Analytics
-
-**Daily Summary**
-```
-GET /api/analytics/daily-summary?date=2024-01-15
-
-Response: 200 OK
-{
-    "date": "2024-01-15",
-    "total_machines": 6,
-    "total_entries": 18,
-    "total_planned": 1500,
-    "total_actual": 1200,
-    "efficiency": 80.0,
-    "by_shift": {
-        "A": {"planned": 500, "actual": 420, "efficiency": 84.0},
-        "B": {"planned": 500, "actual": 420, "efficiency": 84.0},
-        "C": {"planned": 500, "actual": 360, "efficiency": 72.0}
-    }
-}
-```
-
-**Machine Performance** (30-day period)
-```
-GET /api/analytics/machine-performance?days=30
-
-Response: 200 OK
-{
-    "machines": [
-        {
-            "machine_id": 1,
-            "machine_name": "VMC-1",
-            "efficiency_percent": 85.5,
-            "avg_downtime_minutes": 12.5,
-            "entries_count": 45
-        }
-    ]
-}
-```
-
-**Top Issues** (Root cause analysis)
-```
-GET /api/analytics/top-issues?days=30&start_date=2024-01-01
-
-Response: 200 OK
-{
-    "top_issues": [
-        {
-            "issue_name": "No Operator",
-            "category": "NO_OPERATOR",
-            "count": 45,
-            "total_impact_minutes": 1350
-        }
-    ]
-}
-```
-
-#### Master Data
-
-**Get Machines**
-```
-GET /master/api/machines?status=Active
-
-Response: 200 OK
-[
-    {"id": 1, "name": "VMC-1"},
-    {"id": 2, "name": "VMC-2"}
-]
-```
-
-**Get Customers**
-```
-GET /master/api/customers
-
-Response: 200 OK
-[...]
-```
-
-**Bulk Import CSV**
-```
-POST /api/import/csv
-Content-Type: multipart/form-data
-?user=operator_1
-
-file: production_data.csv
-
-Response: 200 OK
-{
-    "imported": 150,
-    "errors": [],
-    "message": "150 entries imported successfully"
-}
-```
-
----
-
-## Improvement Ideas & Enhancements
-
-### 🚀 Phase 2: Advanced Features
-
-#### 1. **Predictive Analytics**
-- Machine Learning model to predict breakdowns
-- Trend forecasting for production demand
-- Anomaly detection to flag unusual patterns
-- Recommendation engine for optimization
-
-#### 2. **Real-time Alerts**
-- SMS/Email alerts for critical issues (No operator, No material)
-- Push notifications for shift supervisors
-- Automated escalation for downtime > threshold
-- Daily summary reports
-
-#### 3. **IoT Integration**
-- Direct integration with PLC/CNC control systems
-- Automatic actual quantity input from machines
-- Real-time machine status monitoring
-- Predictive maintenance based on signals
-
-#### 4. **Mobile App**
-- Lightweight mobile interface for operators
-- Offline data collection (sync when online)
-- Photo evidence upload for issues
-- Quick-entry templates
-
-#### 5. **Advanced Reporting**
-- PDF report generation
-- Export to Excel with formatting
-- Custom report builder
-- Scheduled report distribution
-
-#### 6. **Resource Optimization**
-- Machine scheduling optimization
-- Operator skill-to-task matching
-- Production bottleneck solver
-- Shift load balancing
-
-#### 7. **Quality Tracking**
-- Integration with QC module
-- Defect rate tracking by machine/shift
-- Correlation with production speed
-- OEE (Overall Equipment Effectiveness) calculation
-
-#### 8. **Historical Analysis**
-- 12-month trends
-- Seasonal pattern detection
-- Year-over-year comparison
-- Capacity planning tools
-
-### 🔧 Phase 2: Infrastructure
-
-#### Authentication & Authorization
-```python
-# Add user roles
-- Operator: Data entry only
-- Supervisor: Data entry + approvals + shift view
-- Manager: All access + reporting
-- Admin: System configuration
-
-# Implement with Flask-Login + JWT tokens
-```
-
-#### Database Optimization
-- Add indexes for common queries
-- Partition large tables by date
-- Implement data archival strategy
-- Backup automation
-
-#### Performance Enhancements
-- Caching layer (Redis) for dashboards
-- Pagination for large result sets
-- Query optimization
-- CDN for static assets
-
-#### Monitoring & Logging
-- Application performance monitoring (APM)
-- Error logging and alerts
-- Database query logging
-- API usage analytics
-
----
-
-## Database Schema Summary
-
-### Core Tables
-
-**machines**
-- Stores machine metadata (name, type, specs)
-
-**customers**
-- Customer information for traceability
-
-**operation_types**
-- Standard operations with cycle times
-
-**employees**
-- Operator/staff directory
-
-**production_entries**
-- Daily production transactions (main data)
-- Indexes on: production_date, shift, machine_id
-
-**production_issues**
-- Issues linked to entries (many-to-many)
-
-**issue_types**
-- Categorized issue definitions
-
-**daily_reports**
-- Pre-computed daily summaries for fast dashboards
-
-**audit_logs**
-- Complete change history
-
----
-
-## Sample Data Entry Workflow
-
-```
-Operator starts shift at 2 PM (B Shift)
-
-1. Opens "New Entry" form
-2. Form pre-fills with:
-   - Date: Today
-   - Shift: B
-   - Operator: Auto-filled from login
-
-3. Selects:
-   - Machine: VMC-3
-   - Customer: C2
-   - Operation: SLITTING
-
-4. Enters:
-   - Planned Quantity: 73 (from work order)
-   - Actual Quantity: 70 (completed at shift end)
-   - Cycle Time: 6 min
-   - Downtime: 0 min
-   - Remarks: (none)
-
-5. Clicks Save
-
-6. System automatically calculates:
-   - Variance: 70 - 73 = -3
-   - Variance %: -3/73 * 100 = -4.1%
-   - Efficiency: 95.9%
-
-7. Data appears in:
-   - Daily Dashboard (real-time)
-   - Shift Summary
-   - Weekly Report
-   - Machine Performance Analytics
-```
-
----
-
-## Troubleshooting
-
-### Issue: Database connection error
-```
-Solution:
-1. Verify PostgreSQL is running: pg_isready
-2. Check credentials in .env
-3. Verify database exists: psql -l
-4. Check (connection string format
-```
-
-### Issue: Port 5000 already in use
-```
-Flask run -p 5001
-# Or kill the process using port 5000
-```
-
-### Issue: Import errors
-```
-pip install --upgrade -r requirements.txt
-pip install -e .
-```
-
----
-
-## Performance Metrics to Track
-
-1. **Production Metrics**
-   - Daily output vs planned
-   - Shift-wise efficiency
-   - Machine utilization rate
-   - Downtime percentage
-
-2. **Quality Metrics**
-   - Defect rate by machine
-   - QC rejection rate
-   - Rework time
-
-3. **Operational Metrics**
-   - Average cycle time vs standard
-   - Setup time
-   - Changeover efficiency
-
-4. **People Metrics**
-   - Operator efficiency
-   - Shift performance
-   - Training effectiveness
-
----
-
-## Contributing
-
-To add new features:
-
-1. Create a feature branch: `git checkout -b feature/name`
-2. Make changes and test locally
-3. Submit pull request with description
-4. Code review and merge
-
----
-
-## License
-
-Internal use only - Global Aluminium Pvt Ltd
-
----
-
-## Support
-
-For issues or feature requests, contact the Production Planning Team.
-
----
-
-**Last Updated**: February 16, 2026
-**Version**: 1.0 - MVP Release
+It helps the Production Department and Quality Department work with shared data, shared traceability, and shared visibility. That improves decision-making, reduces manual reporting effort, and makes it easier to control output, rejection, rework, and performance on the shop floor.
